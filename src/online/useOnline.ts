@@ -11,6 +11,8 @@ export interface RoomSettings {
   artists: string[];
   rounds: number;
   timeSec: number;
+  /** Músicas com palavrão liberadas. */
+  explicit: boolean;
 }
 
 export interface OnlinePlayer {

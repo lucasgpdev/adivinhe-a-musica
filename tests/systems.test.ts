@@ -12,7 +12,7 @@ import { fakeTracks, itunesSong } from './fixtures';
 
 describe('catálogo (verificação)', () => {
   const matue = ARTIST_BY_ID['matue'];
-  it('aceita só o artista exato, remove explícitas, variantes, sem prévia e duplicatas', () => {
+  it('aceita só o artista exato, guarda a versão explícita à parte, remove variantes, sem prévia e duplicatas', () => {
     const res = processArtistResults(matue, [
       itunesSong({ trackId: 1, artistId: 10, artistName: 'Matuê', trackName: 'Faixa A' }),
       itunesSong({ trackId: 2, artistId: 10, artistName: 'Matuê', trackName: 'Faixa B', trackExplicitness: 'explicit' }),
@@ -24,14 +24,28 @@ describe('catálogo (verificação)', () => {
       itunesSong({ trackId: 8, artistId: 10, artistName: 'Matuê', trackName: 'Faixa F (feat. Alguém)', trackExplicitness: 'cleaned', trackCensoredName: 'Faixa F (feat. Alguém)' }),
     ], undefined, new Date('2026-06-01'));
     expect(res.status.status).toBe('ok');
-    expect(res.tracks.map((t) => t.trackId)).toEqual([1, 5, 8]);
-    expect(res.status.removedExplicit).toBe(1);
+    expect(res.tracks.map((t) => t.trackId)).toEqual([1, 2, 5, 8]);
+    expect(res.tracks[1].explicitness).toBe('explicit');
+    expect(res.status.removedExplicit).toBe(0);
     expect(res.status.removedVariants).toBe(1);
     expect(res.status.removedNoPreview).toBe(1);
-    expect(res.tracks[1].featured).toEqual(['Teto', 'WIU']);
-    expect(res.tracks[2].displayTitle).toBe('Faixa F');
-    expect(res.tracks[2].featured).toEqual(['Alguém']);
+    expect(res.tracks[2].featured).toEqual(['Teto', 'WIU']);
+    expect(res.tracks[3].displayTitle).toBe('Faixa F');
+    expect(res.tracks[3].featured).toEqual(['Alguém']);
     expect(res.tracks.every((t) => t.artistId === 'matue' && t.verification === 'verificado')).toBe(true);
+  });
+  it('com palavrão toca a versão explícita; sem palavrão, só as limpas', () => {
+    const res = processArtistResults(matue, [
+      itunesSong({ trackId: 1, artistId: 10, artistName: 'Matuê', trackName: 'Limpa' }),
+      itunesSong({ trackId: 2, artistId: 10, artistName: 'Matuê', trackName: 'Dupla', trackExplicitness: 'cleaned', trackCensoredName: 'Dupla' }),
+      itunesSong({ trackId: 3, artistId: 10, artistName: 'Matuê', trackName: 'Dupla', trackExplicitness: 'explicit' }),
+      itunesSong({ trackId: 4, artistId: 10, artistName: 'Matuê', trackName: 'Só Explícita', trackExplicitness: 'explicit' }),
+    ], undefined);
+    const ids = (explicit: boolean) => filterPool(res.tracks, { categories: [], artists: [], extra: 'random', explicit }).map((t) => t.trackId).sort();
+    expect(ids(false)).toEqual([1, 2]);
+    expect(ids(true)).toEqual([1, 3, 4]);
+    // as duas versões da mesma música têm a mesma posição/dificuldade
+    expect(res.tracks.find((t) => t.trackId === 2)!.rankInArtist).toBe(res.tracks.find((t) => t.trackId === 3)!.rankInArtist);
   });
   it('artista com nome ambíguo fica pendente até confirmação', () => {
     const derek = ARTIST_BY_ID['derek'];

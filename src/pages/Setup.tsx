@@ -30,13 +30,14 @@ export function SetupPage({ mode: modeId, playerIds: preset, context, category }
   const [categories, setCategories] = useState<CategoryId[]>(category ? [category] : []);
   const [artists, setArtists] = useState<string[]>([]);
   const [extra, setExtra] = useState<ExtraFilter>('random');
+  const [explicit, setExplicit] = useState(true);
   const [custom, setCustom] = useState<CustomOptions>(DEFAULT_CUSTOM);
   const [newName, setNewName] = useState('');
 
   const enabledCats = CATEGORIES.filter((c) => data.settings.enabledCategories.includes(c.id));
   const effectiveCats = categories.length ? categories : enabledCats.length < CATEGORIES.length ? enabledCats.map((c) => c.id) : [];
-  const filters = { categories: effectiveCats, artists, extra };
-  const pool = useMemo(() => filterPool(tracks, filters), [tracks, effectiveCats.join(), artists.join(), extra]); // eslint-disable-line react-hooks/exhaustive-deps
+  const filters = { categories: effectiveCats, artists, extra, explicit };
+  const pool = useMemo(() => filterPool(tracks, filters), [tracks, effectiveCats.join(), artists.join(), extra, explicit]); // eslint-disable-line react-hooks/exhaustive-deps
   const titles = distinctTitles(pool);
   const needed = modeId === 'custom' ? custom.questions : mode.questions;
   const players = selected.map((id) => data.players.find((p) => p.id === id)).filter((p): p is NonNullable<typeof p> => !!p);
@@ -132,7 +133,8 @@ export function SetupPage({ mode: modeId, playerIds: preset, context, category }
               {enabledCats.map((c) => <Chip key={c.id} active={categories.includes(c.id)} onClick={() => setCategories(toggle(categories, c.id))}>{c.name}</Chip>)}
             </div>
             <div className="label mb-3 mt-6">Artistas {artists.length > 0 && <span className="normal-case tracking-normal text-zinc-400">· {artists.length} selecionado(s)</span>}</div>
-            <ArtistSearch tracks={tracks} selected={artists} onChange={setArtists} />
+            <ArtistSearch tracks={filterPool(tracks, { categories: [], artists: [], extra: 'random', explicit })} selected={artists} onChange={setArtists} />
+            <div className="mt-4"><Toggle label="Com palavrão" description={explicit ? 'Toca a versão original das músicas (explícita).' : 'Só versões limpas, sem palavrão.'} checked={explicit} onChange={setExplicit} /></div>
             <div className="label mb-3 mt-6">Seleção de músicas</div>
             <Segmented size="sm" value={extra} onChange={setExtra} options={EXTRA} />
           </section>

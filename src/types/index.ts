@@ -54,8 +54,10 @@ export interface Track {
   storeUrl?: string;
   artworkUrl?: string;
   source: 'apple-itunes-preview';
-  /** notExplicit = sem conteúdo explícito; cleaned = versão editada (limpa). */
-  explicitness: 'notExplicit' | 'cleaned';
+  /** notExplicit = sem conteúdo explícito; cleaned = versão editada (limpa); explicit = original com palavrão. */
+  explicitness: 'notExplicit' | 'cleaned' | 'explicit';
+  /** Versão limpa que também existe na versão explícita (com palavrão liberado, toca a explícita). */
+  explicitTwin?: boolean;
   verification: 'verificado';
   verifiedAt: string;
   rankInArtist: number;
@@ -143,6 +145,8 @@ export interface MatchFilters {
   categories: CategoryId[];
   artists: string[];
   extra: ExtraFilter;
+  /** Liberar músicas com palavrão (versões explícitas). */
+  explicit?: boolean;
 }
 
 export type ExtraFilter = 'random' | 'old' | 'new' | 'big-hits' | 'popular' | 'hard';

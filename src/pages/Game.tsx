@@ -535,7 +535,7 @@ function SongCard({ track }: { track: Track }) {
         <div className="mt-0.5 text-xs text-zinc-500">
           {track.featured.length > 0 && <>Participação: {track.featured.join(', ')} · </>}
           {track.year && <>{track.year} · </>}
-          {track.explicitness === 'cleaned' ? 'Versão limpa' : 'Sem conteúdo explícito'}
+          {track.explicitness === 'cleaned' ? 'Versão limpa' : track.explicitness === 'explicit' ? 'Versão explícita' : 'Sem conteúdo explícito'}
         </div>
       </div>
     </div>

@@ -194,10 +194,11 @@ function snippetFor(s: Session, d: Difficulty, timeSec: number): { start: number
   const r = s.rng;
   if (s.config.mode.mysterious) return { start: 3 + Math.floor(r() * 15), sec: MYSTERY_LEVELS[0].seconds };
   switch (d) {
-    case 1: return { start: 0, sec: Math.min(29, Math.max(timeSec, 12)) };
-    case 2: return { start: Math.floor(r() * 8), sec: Math.min(10, Math.max(timeSec, 6)) };
-    case 3: return { start: 4 + Math.floor(r() * 12), sec: 5 };
-    default: return { start: 6 + Math.floor(r() * 14), sec: 2.5 };
+    // trechos mais longos: a música toca durante todo (ou quase todo) o tempo da pergunta
+    case 1: return { start: 0, sec: Math.min(29, Math.max(timeSec, 15)) };
+    case 2: return { start: Math.floor(r() * 6), sec: Math.min(22, Math.max(timeSec, 12)) };
+    case 3: return { start: 3 + Math.floor(r() * 8), sec: Math.min(15, Math.max(timeSec * 0.7, 8)) };
+    default: return { start: 5 + Math.floor(r() * 10), sec: 5 };
   }
 }
 

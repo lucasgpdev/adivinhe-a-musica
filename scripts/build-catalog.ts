@@ -92,7 +92,7 @@ async function main() {
     }
     const r = applyFeatured(all, [f]);
     all = r.tracks;
-    console.log(`[catálogo] destaque ${a.name} - "${f.title}": ${r.missing.length ? 'NÃO encontrada em versão limpa com prévia' : 'ok'}`);
+    console.log(`[catálogo] destaque ${a.name} - "${f.title}": ${r.missing.length ? 'NÃO encontrada (sem prévia oficial)' : 'ok'}`);
   }
 
   const catalog: Catalog = { ...EMPTY_CATALOG, syncedAt: new Date().toISOString(), artists, tracks: all };

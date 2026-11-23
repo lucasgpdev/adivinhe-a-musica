@@ -41,6 +41,9 @@ describe('sala online (lógica)', () => {
     ['p1', 'p2', 'p3', 'p4'].forEach((id, i) => { c.advance(1); r.join(id, `Jog ${i}`, 'headphones'); });
     expect(r.hostId).toBe('p1');
     expect(r.snapshot().players.map((p) => p.team)).toEqual(['A', 'B', 'A', 'B']);
+    expect(r.settings.timeSec).toBe(20); // padrão novo: música mais longa
+    expect(r.settings.explicit).toBe(true);
+    r.updateSettings('p1', { timeSec: 15 });
     expect(r.start('p2', [q(1), q(2), q(3)])).toMatch(/dono/);
     expect(r.start('p1', [q(1), q(2), q(3)])).toBeNull();
     expect(r.phase).toBe('countdown');

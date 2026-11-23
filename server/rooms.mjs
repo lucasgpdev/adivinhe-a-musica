@@ -19,7 +19,7 @@ export const GRACE_MS = 600;
 export const NAME_MAX = 24;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-export const DEFAULT_SETTINGS = { format: 'teams', categories: [], artists: [], rounds: 10, timeSec: 15 };
+export const DEFAULT_SETTINGS = { format: 'teams', categories: [], artists: [], rounds: 10, timeSec: 20, explicit: true };
 export const CHAT_MAX = 200;
 export const CHAT_HISTORY = 60;
 /** Anti-flood: no máximo CHAT_BURST mensagens a cada CHAT_WINDOW_MS por jogador. */
@@ -44,6 +44,7 @@ export function sanitizeSettings(s, prev = DEFAULT_SETTINGS) {
   if (s && Array.isArray(s.artists)) out.artists = [...new Set(s.artists.filter((c) => typeof c === 'string').map((c) => c.slice(0, 64)))].slice(0, 60);
   if (s && Number.isFinite(s.rounds)) out.rounds = Math.max(5, Math.min(30, Math.round(s.rounds)));
   if (s && Number.isFinite(s.timeSec)) out.timeSec = Math.max(5, Math.min(30, Math.round(s.timeSec)));
+  if (s && typeof s.explicit === 'boolean') out.explicit = s.explicit;
   return out;
 }
 

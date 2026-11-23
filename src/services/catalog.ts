@@ -7,7 +7,8 @@
  *  - O artista é conferido pelo nome exato (sem acento/caixa) e pelo ID do artista na Apple.
  *    Se houver mais de um artista com o mesmo nome, a música só entra depois que o
  *    professor confirmar qual é o correto no painel.
- *  - Somente versões não explícitas ou limpas (campo oficial trackExplicitness).
+ *  - Guarda a versão limpa E a explícita (campo oficial trackExplicitness); o jogo escolhe
+ *    qual usar conforme a opção "com palavrão" (filterPool).
  *  - Versões alternativas (ao vivo, remix, acelerada, instrumental...) são descartadas.
  *  - Sem prévia oficial → música não entra.
  *  - Nenhuma letra é exibida.
@@ -146,20 +147,28 @@ export function processArtistResults(
   base.appleArtistId = chosen[0];
   base.appleArtistName = mine[0] ? splitArtists(mine[0].artistName)[0] : artist.name;
 
-  const seen = new Set<string>();
-  const kept: ItunesTrack[] = [];
+  // Uma versão limpa e uma explícita por título (a mesma música aparece em vários álbuns/singles).
+  const seenClean = new Set<string>();
+  const seenExplicit = new Set<string>();
+  const order = new Map<string, number>(); // posição do título na lista da Apple (popularidade)
+  const kept: { s: ItunesTrack; key: string }[] = [];
   for (const s of mine) {
     if (!s.previewUrl) { base.removedNoPreview++; continue; }
-    if (s.trackExplicitness === 'explicit' || !s.trackExplicitness) { base.removedExplicit++; continue; }
+    if (!s.trackExplicitness) { base.removedExplicit++; continue; } // classificação desconhecida
     if (isVariant(s.trackName)) { base.removedVariants++; continue; }
+    const explicit = s.trackExplicitness === 'explicit';
     const title = s.trackExplicitness === 'cleaned' && s.trackCensoredName ? s.trackCensoredName : s.trackName;
     const key = normalize(cleanTitle(title).displayTitle);
-    if (!key || seen.has(key)) continue; // mesma música em outro álbum/single
+    const seen = explicit ? seenExplicit : seenClean;
+    if (!key || seen.has(key)) continue;
     seen.add(key);
-    kept.push(s);
+    if (!order.has(key)) order.set(key, order.size);
+    kept.push({ s, key });
   }
+  const unique = order.size;
 
-  const tracks: Track[] = kept.map((s, i) => {
+  const tracks: Track[] = kept.map(({ s, key }) => {
+    const i = order.get(key)!;
     const title = s.trackExplicitness === 'cleaned' && s.trackCensoredName ? s.trackCensoredName : s.trackName;
     const { displayTitle, featured } = cleanTitle(title);
     const credited = splitArtists(s.artistName).slice(1);
@@ -174,14 +183,15 @@ export function processArtistResults(
       artistName: s.artistName,
       featured: feats,
       categories: [...artist.categories] as CategoryId[],
-      difficulty: difficultyFromRank(i, kept.length),
+      difficulty: difficultyFromRank(i, unique),
       year: year && Number.isFinite(year) ? year : undefined,
       album: s.collectionName,
       previewUrl: s.previewUrl!,
       storeUrl: s.trackViewUrl,
       artworkUrl: s.artworkUrl100?.replace('100x100bb', '300x300bb'),
       source: 'apple-itunes-preview',
-      explicitness: s.trackExplicitness as 'notExplicit' | 'cleaned',
+      explicitness: s.trackExplicitness as Track['explicitness'],
+      explicitTwin: s.trackExplicitness !== 'explicit' && seenExplicit.has(key) ? true : undefined,
       verification: 'verificado',
       verifiedAt: syncedAt,
       rankInArtist: i,
@@ -279,6 +289,8 @@ export interface PoolFilters {
   categories: CategoryId[];
   artists: string[];
   extra: ExtraFilter;
+  /** true = com palavrão (toca a versão explícita quando existir); false/ausente = só versões limpas. */
+  explicit?: boolean;
 }
 
 export function usableTracks(c: Catalog): Track[] {
@@ -289,7 +301,9 @@ export function usableTracks(c: Catalog): Track[] {
 }
 
 export function filterPool(tracks: Track[], f: PoolFilters, now = new Date()): Track[] {
-  let pool = tracks;
+  let pool = f.explicit
+    ? tracks.filter((t) => !t.explicitTwin)
+    : tracks.filter((t) => t.explicitness !== 'explicit');
   if (f.artists.length) pool = pool.filter((t) => f.artists.includes(t.artistId));
   if (f.categories.length) pool = pool.filter((t) => t.categories.some((c) => f.categories.includes(c)));
   const y = now.getFullYear();

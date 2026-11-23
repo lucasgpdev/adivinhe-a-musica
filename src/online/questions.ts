@@ -17,9 +17,13 @@ export interface OnlineQuestion {
  */
 export function buildOnlineQuestions(
   tracks: Track[], categories: CategoryId[], rounds: number, rng: () => number = Math.random, artists: string[] = [],
+  opts: { explicit?: boolean; timeSec?: number } = {},
 ): OnlineQuestion[] {
-  const pool = filterPool(tracks, { categories, artists, extra: 'random' }, new Date());
-  const all = tracks;
+  const pool = filterPool(tracks, { categories, artists, extra: 'random', explicit: opts.explicit }, new Date());
+  const all = filterPool(tracks, { categories: [], artists: [], extra: 'random', explicit: opts.explicit }, new Date());
+  // a prévia da Apple tem 30s: começa cedo o bastante para tocar o tempo todo da pergunta
+  const timeSec = opts.timeSec ?? 15;
+  const startFor = (d: number) => (d === 1 || timeSec >= 25 ? 0 : Math.floor(rng() * Math.max(1, Math.min(10, 30 - timeSec))));
   const used = new Set<string>();
   const out: OnlineQuestion[] = [];
   for (const t of shuffle(pool, rng)) {
@@ -33,7 +37,7 @@ export function buildOnlineQuestions(
     used.add(key);
     out.push({
       previewUrl: t.previewUrl,
-      snippetStart: d === 1 ? 0 : Math.floor(rng() * 10),
+      snippetStart: startFor(d),
       options: opts.map((o) => ({ id: o.id, title: o.displayTitle })),
       answerId: t.id,
       track: { title: t.title, artistName: t.artistName, artworkUrl: t.artworkUrl, year: t.year, storeUrl: t.storeUrl },
@@ -49,7 +53,7 @@ export function buildOnlineQuestions(
       if (!opts) continue;
       used.add(key);
       out.push({
-        previewUrl: t.previewUrl, snippetStart: Math.floor(rng() * 10),
+        previewUrl: t.previewUrl, snippetStart: startFor(2),
         options: opts.map((o) => ({ id: o.id, title: o.displayTitle })), answerId: t.id,
         track: { title: t.title, artistName: t.artistName, artworkUrl: t.artworkUrl, year: t.year, storeUrl: t.storeUrl },
       });

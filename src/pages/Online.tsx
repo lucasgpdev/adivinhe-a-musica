@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AudioEngine } from '../audio/AudioEngine';
 import { sfx } from '../audio/sfx';
 import { ArtistSearch } from '../components/ArtistSearch';
-import { Badge, Button, Chip, PageHeader, Segmented, Spinner } from '../components/ui';
+import { Badge, Button, Chip, PageHeader, Segmented, Spinner, Toggle } from '../components/ui';
 import { Avatar, Confetti, Equalizer, Podium, TimerRing } from '../components/visuals';
 import { AVATARS } from '../data/cosmetics';
 import { CATEGORIES } from '../data/artists';
@@ -251,7 +251,7 @@ function Menu({ profile, inviteCode, online, onEditProfile }: { profile: { name:
           <div className="mb-3 flex items-center gap-2 text-accent-soft"><Crown size={18} /><span className="label !text-accent-soft">Criar sala</span></div>
           <p className="flex-1 text-sm text-zinc-400">Você será o dono da sala: escolhe o formato (times de 1v1 até 4v4 ou todos contra todos), os gêneros e quando começar.</p>
           <Button variant="primary" size="lg" className="mt-5" disabled={busy} icon={<Play size={18} fill="currentColor" />}
-            onClick={() => online.create({ format: 'teams', categories: [], artists: [], rounds: 10, timeSec: 15 })}>
+            onClick={() => online.create({ format: 'teams', categories: [], artists: [], rounds: 10, timeSec: 20, explicit: true })}>
             Criar sala
           </Button>
         </div>
@@ -277,11 +277,11 @@ function LobbyView({ room, online }: { room: RoomState; online: Online }) {
   const [copied, setCopied] = useState(false);
   const link = `${location.origin}${location.pathname}?sala=${room.code}`;
   const counts = useMemo(
-    () => Object.fromEntries(CATEGORIES.map((c) => [c.id, filterPool(tracks, { categories: [c.id], artists: [], extra: 'random' }).length])),
-    [tracks],
+    () => Object.fromEntries(CATEGORIES.map((c) => [c.id, filterPool(tracks, { categories: [c.id], artists: [], extra: 'random', explicit: s.explicit }).length])),
+    [tracks, s.explicit],
   );
   const artistsSel = s.artists ?? [];
-  const available = filterPool(tracks, { categories: s.categories, artists: artistsSel, extra: 'random' }).length;
+  const available = filterPool(tracks, { categories: s.categories, artists: artistsSel, extra: 'random', explicit: s.explicit }).length;
   const teamsOk = s.format !== 'teams' || (room.players.some((p) => p.team === 'A') && room.players.some((p) => p.team === 'B'));
   const enough = s.format === 'teams' ? teamsOk : room.players.length >= 2;
 
@@ -291,7 +291,7 @@ function LobbyView({ room, online }: { room: RoomState; online: Online }) {
   const toggleCat = (c: CategoryId) =>
     online.updateSettings({ categories: s.categories.includes(c) ? s.categories.filter((x) => x !== c) : [...s.categories, c] });
   const start = () => {
-    const qs = buildOnlineQuestions(tracks, s.categories, s.rounds, Math.random, artistsSel);
+    const qs = buildOnlineQuestions(tracks, s.categories, s.rounds, Math.random, artistsSel, { explicit: s.explicit, timeSec: s.timeSec });
     online.start(qs);
   };
   const size = s.format === 'teams'
@@ -375,7 +375,7 @@ function LobbyView({ room, online }: { room: RoomState; online: Online }) {
           <div>
             <div className="mb-2 flex items-center gap-1.5 text-sm font-medium"><Search size={14} /> Cantores <span className="font-normal text-zinc-500">{artistsSel.length ? '' : '(todos)'}</span></div>
             <ArtistSearch
-              tracks={s.categories.length ? filterPool(tracks, { categories: s.categories, artists: [], extra: 'random' }) : tracks}
+              tracks={filterPool(tracks, { categories: s.categories, artists: [], extra: 'random', explicit: s.explicit })}
               selected={artistsSel} onChange={(ids) => online.updateSettings({ artists: ids })} disabled={!isHost}
             />
           </div>
@@ -389,10 +389,14 @@ function LobbyView({ room, online }: { room: RoomState; online: Online }) {
             <div>
               <div className="mb-2 text-sm font-medium">Tempo</div>
               <Disabled off={!isHost}>
-                <Segmented size="sm" value={String(s.timeSec)} onChange={(v) => online.updateSettings({ timeSec: Number(v) })} options={[10, 15, 20].map((n) => ({ value: String(n), label: `${n}s` }))} />
+                <Segmented size="sm" value={String(s.timeSec)} onChange={(v) => online.updateSettings({ timeSec: Number(v) })} options={[10, 15, 20, 30].map((n) => ({ value: String(n), label: `${n}s` }))} />
               </Disabled>
             </div>
           </div>
+          <Toggle
+            label="Com palavrão" description={s.explicit ? 'Toca a versão original das músicas (explícita).' : 'Só versões limpas, sem palavrão.'}
+            checked={s.explicit} onChange={(v) => online.updateSettings({ explicit: v })} disabled={!isHost}
+          />
           {isHost ? (
             <>
               <Button variant="primary" size="lg" className="w-full" icon={<Play size={18} fill="currentColor" />} onClick={start} disabled={!enough || available < 8}>
@@ -472,7 +476,8 @@ function MatchView({ room, online }: { room: RoomState; online: Online }) {
       setBlocked(false);
       e.load(q.previewUrl).catch(() => undefined);
     } else if (room.phase === 'question') {
-      const play = () => e.playSnippet(q.snippetStart, room.settings.timeSec).catch((err) => {
+      // toca até o fim da prévia (30s): continua tocando na revelação da resposta
+      const play = () => e.playSnippet(q.snippetStart, 30).catch((err) => {
         if ((err as { kind?: string }).kind === 'blocked') setBlocked(true);
       });
       e.load(q.previewUrl).then(play, play);
