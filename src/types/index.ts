@@ -5,6 +5,7 @@
 export type CategoryId =
   | 'trap'
   | 'funk'
+  | 'funk-pesado'
   | 'rap'
   | 'sertanejo'
   | 'sofrencia'

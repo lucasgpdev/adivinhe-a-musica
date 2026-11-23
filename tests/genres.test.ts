@@ -73,6 +73,6 @@ describe('gêneros', () => {
     // depois de salvo, não reativa o que for desligado
     const again = migrate({ settings: { ...d.settings, enabledCategories: ['trap'] } });
     expect(again.settings.enabledCategories).toEqual(['trap']);
-    expect(ALL_CATEGORY_IDS.length).toBe(14);
+    expect(ALL_CATEGORY_IDS.length).toBe(15);
   });
 });
