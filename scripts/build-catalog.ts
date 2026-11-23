@@ -25,9 +25,9 @@ if (!process.env.RENDER && !process.env.BUILD_CATALOG) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function search(name: string, byArtist = true, country = 'BR'): Promise<ItunesTrack[]> {
+async function search(name: string, byArtist = true): Promise<ItunesTrack[]> {
   const q = new URLSearchParams({
-    term: name, country, media: 'music', entity: 'song', limit: '200', explicit: 'Yes',
+    term: name, country: 'BR', media: 'music', entity: 'song', limit: '200', explicit: 'Yes',
   });
   if (byArtist) q.set('attribute', 'artistTerm');
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -50,49 +50,22 @@ async function search(name: string, byArtist = true, country = 'BR'): Promise<It
 }
 
 const rawExplicitness: Record<string, number> = {};
-let usExplicit = 0;
+let lookupExplicit = 0;
 
 async function get(url: string): Promise<ItunesTrack[]> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return ((await res.json()) as ItunesResponse).results;
-}
-
-/** Diagnóstico: de onde a Apple devolve as versões explícitas? */
-async function diagnoseExplicit() {
-  const dist = (rs: ItunesTrack[]) => {
-    const d: Record<string, number> = {};
-    for (const r of rs) if (r.wrapperType === 'track') d[r.trackExplicitness ?? '?'] = (d[r.trackExplicitness ?? '?'] ?? 0) + 1;
-    return JSON.stringify(d);
-  };
-  try {
-    const probe = await get('https://itunes.apple.com/search?term=MC+Ryan+SP&country=BR&entity=song&limit=5');
-    const id = probe.find((r) => /ryan/i.test(r.artistName))?.artistId;
-    console.log(`[diagnóstico] artistId MC Ryan SP = ${id}`);
-    const urls: Record<string, string> = {
-      'lookup BR': `https://itunes.apple.com/lookup?id=${id}&entity=song&limit=200&country=BR`,
-      'lookup US': `https://itunes.apple.com/lookup?id=${id}&entity=song&limit=200&country=US`,
-      'lookup BR explicit=Yes': `https://itunes.apple.com/lookup?id=${id}&entity=song&limit=200&country=BR&explicit=Yes`,
-      'search musicTrack': 'https://itunes.apple.com/search?term=MC+Ryan+SP&country=BR&media=music&entity=musicTrack&limit=200&explicit=Yes',
-      'search sem explicit': 'https://itunes.apple.com/search?term=MC+Ryan+SP&country=BR&media=music&entity=song&limit=200',
-      'album lookup': `https://itunes.apple.com/lookup?id=${id}&entity=album&limit=50&country=BR`,
-    };
-    for (const [k, u] of Object.entries(urls)) {
-      await sleep(INTERVAL_MS);
-      const rs = await get(u);
-      const albums = rs.filter((r) => (r as unknown as { collectionExplicitness?: string }).collectionExplicitness);
-      const adist: Record<string, number> = {};
-      for (const a of albums) { const e = (a as unknown as { collectionExplicitness: string }).collectionExplicitness; adist[e] = (adist[e] ?? 0) + 1; }
-      console.log(`[diagnóstico] ${k}: faixas ${dist(rs)} · álbuns ${JSON.stringify(adist)}`);
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if ((res.status === 403 || res.status === 429 || res.status >= 500) && attempt < 3) {
+      await sleep(15000 * (attempt + 1));
+      continue;
     }
-  } catch (e) {
-    console.log(`[diagnóstico] erro: ${(e as Error).message}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return ((await res.json()) as ItunesResponse).results;
   }
 }
 
 async function main() {
   const started = Date.now();
-  await diagnoseExplicit();
   const artists: Catalog['artists'] = {};
   let tracks: Track[] = [];
   for (const [i, a] of ARTISTS.entries()) {
@@ -104,22 +77,25 @@ async function main() {
         const k = r0.trackExplicitness ?? 'sem-classificacao';
         rawExplicitness[k] = (rawExplicitness[k] ?? 0) + 1;
       }
-      // A loja do Brasil pode não devolver versões explícitas: busca o original na loja dos EUA
-      // (mesmos IDs de artista e de faixa; as prévias tocam em qualquer país).
-      const EXPLICIT_GENRES = ['funk', 'funk-pesado', 'trap', 'rap'];
-      if (!results.some((x) => x.trackExplicitness === 'explicit') && a.categories.some((c) => EXPLICIT_GENRES.includes(c))) {
-        await sleep(INTERVAL_MS);
-        try {
-          const us = (await search(a.name, true, 'US')).filter((x) => x.trackExplicitness === 'explicit');
-          usExplicit += us.length;
-          results.push(...us);
-        } catch { /* segue só com o Brasil */ }
-      }
       let r = processArtistResults(a, results, undefined);
       if (r.status.status === 'pendente' && r.status.candidates?.length) {
         // Sem professor para confirmar: escolhe o perfil (mesmo nome) do gênero certo com mais músicas.
         const pick = r.status.candidates.find((c) => c.genres.some((g) => a.categories.some((cat) => CATEGORY_GENRES[cat].test(g))));
         if (pick) r = processArtistResults(a, results, [pick.appleArtistId]);
+      }
+      // A busca da Apple esconde as versões explícitas; a discografia pelo ID do artista traz todas.
+      const appleId = r.status.appleArtistId;
+      if (appleId && r.status.status !== 'pendente' && r.status.status !== 'nao-encontrado') {
+        await sleep(INTERVAL_MS);
+        try {
+          const disc = await get(`https://itunes.apple.com/lookup?id=${appleId}&entity=song&limit=200&country=BR`);
+          const known = new Set(results.map((x) => x.trackId));
+          const merged = [...results, ...disc.filter((x) => x.wrapperType === 'track' && !known.has(x.trackId))];
+          r = processArtistResults(a, merged, [appleId]);
+          for (const x of disc) if (x.wrapperType === 'track' && x.trackExplicitness === 'explicit') lookupExplicit++;
+        } catch (e) {
+          console.log(`[catálogo]   discografia de ${a.name} falhou: ${(e as Error).message}`);
+        }
       }
       artists[a.id] = r.status;
       tracks = tracks.concat(r.tracks);
@@ -157,7 +133,7 @@ async function main() {
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, JSON.stringify(catalog));
   console.log(`[catálogo] classificação da Apple (bruto): ${JSON.stringify(rawExplicitness)}`);
-  console.log(`[catálogo] explícitas vindas da loja dos EUA: ${usExplicit}`);
+  console.log(`[catálogo] faixas explícitas achadas pela discografia: ${lookupExplicit}`);
   console.log(`[catálogo] versões explícitas no catálogo: ${all.filter((t) => t.explicitness === 'explicit').length}`);
   const perCat: Record<string, number> = {};
   for (const t of catalog.tracks) for (const c of t.categories) perCat[c] = (perCat[c] ?? 0) + 1;
