@@ -25,9 +25,9 @@ if (!process.env.RENDER && !process.env.BUILD_CATALOG) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function search(name: string, byArtist = true): Promise<ItunesTrack[]> {
+async function search(name: string, byArtist = true, country = 'BR'): Promise<ItunesTrack[]> {
   const q = new URLSearchParams({
-    term: name, country: 'BR', media: 'music', entity: 'song', limit: '200', explicit: 'Yes',
+    term: name, country, media: 'music', entity: 'song', limit: '200', explicit: 'Yes',
   });
   if (byArtist) q.set('attribute', 'artistTerm');
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -49,6 +49,9 @@ async function search(name: string, byArtist = true): Promise<ItunesTrack[]> {
   throw new Error('Apple indisponível');
 }
 
+const rawExplicitness: Record<string, number> = {};
+let usExplicit = 0;
+
 async function main() {
   const started = Date.now();
   const artists: Catalog['artists'] = {};
@@ -57,6 +60,22 @@ async function main() {
     if (i > 0) await sleep(INTERVAL_MS);
     try {
       const results = await search(a.name);
+      for (const r0 of results) {
+        if (r0.wrapperType !== 'track') continue;
+        const k = r0.trackExplicitness ?? 'sem-classificacao';
+        rawExplicitness[k] = (rawExplicitness[k] ?? 0) + 1;
+      }
+      // A loja do Brasil pode não devolver versões explícitas: busca o original na loja dos EUA
+      // (mesmos IDs de artista e de faixa; as prévias tocam em qualquer país).
+      const EXPLICIT_GENRES = ['funk', 'funk-pesado', 'trap', 'rap'];
+      if (!results.some((x) => x.trackExplicitness === 'explicit') && a.categories.some((c) => EXPLICIT_GENRES.includes(c))) {
+        await sleep(INTERVAL_MS);
+        try {
+          const us = (await search(a.name, true, 'US')).filter((x) => x.trackExplicitness === 'explicit');
+          usExplicit += us.length;
+          results.push(...us);
+        } catch { /* segue só com o Brasil */ }
+      }
       let r = processArtistResults(a, results, undefined);
       if (r.status.status === 'pendente' && r.status.candidates?.length) {
         // Sem professor para confirmar: escolhe o perfil (mesmo nome) do gênero certo com mais músicas.
@@ -98,6 +117,9 @@ async function main() {
   const catalog: Catalog = { ...EMPTY_CATALOG, syncedAt: new Date().toISOString(), artists, tracks: all };
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, JSON.stringify(catalog));
+  console.log(`[catálogo] classificação da Apple (bruto): ${JSON.stringify(rawExplicitness)}`);
+  console.log(`[catálogo] explícitas vindas da loja dos EUA: ${usExplicit}`);
+  console.log(`[catálogo] versões explícitas no catálogo: ${all.filter((t) => t.explicitness === 'explicit').length}`);
   const perCat: Record<string, number> = {};
   for (const t of catalog.tracks) for (const c of t.categories) perCat[c] = (perCat[c] ?? 0) + 1;
   console.log(`[catálogo] por gênero: ${Object.entries(perCat).map(([c, n]) => `${c}=${n}`).join(' ')}`);
