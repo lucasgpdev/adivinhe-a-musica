@@ -2,7 +2,20 @@
 // Tipos centrais do jogo ADIVINHE A MÚSICA
 // ─────────────────────────────────────────────────────────────
 
-export type CategoryId = 'trap' | 'funk' | 'rap' | 'hits';
+export type CategoryId =
+  | 'trap'
+  | 'funk'
+  | 'rap'
+  | 'sertanejo'
+  | 'sofrencia'
+  | 'mpb'
+  | 'pop-br'
+  | 'pop-intl'
+  | 'pagode'
+  | 'rock-br'
+  | 'forro'
+  | 'gospel'
+  | 'hits';
 /** 1 = Fácil, 2 = Médio, 3 = Difícil, 4 = Extremo */
 export type Difficulty = 1 | 2 | 3 | 4;
 
@@ -230,6 +243,8 @@ export interface Settings {
   presenter: boolean;
   autoAdvance: boolean;
   enabledCategories: CategoryId[];
+  /** Categorias que já existiam quando as configurações foram salvas (para ativar gêneros novos automaticamente). */
+  knownCategories?: CategoryId[];
   mechanics: MechanicsSettings;
   /** Sobrescreve o tempo dos modos padrão (segundos) — null = padrão do modo. */
   timeOverride: number | null;

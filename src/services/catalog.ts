@@ -12,7 +12,7 @@
  *  - Sem prévia oficial → música não entra.
  *  - Nenhuma letra é exibida.
  */
-import { ARTISTS } from '../data/artists';
+import { ARTISTS, CATEGORY_GENRES } from '../data/artists';
 import type {
   AppleArtistCandidate, ArtistDef, Catalog, CatalogArtistStatus, CategoryId, Difficulty, ExtraFilter, Track,
 } from '../types';
@@ -26,20 +26,31 @@ export const EMPTY_CATALOG: Catalog = {
 const SPLIT_ARTISTS = /\s*(?:,|&|\s+e\s+|\s+x\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+part\.?\s+|\s+com\s+)\s*/i;
 const FEAT_IN_TITLE = /\s*[([]\s*(?:feat\.?|ft\.?|part\.?|participação de|com)\s+([^)\]]+)[)\]]\s*/i;
 const VARIANT = /\b(ao vivo|live|remix|rmx|sped ?up|slowed|acelerad[ao]|instrumental|ac[uú]stic[ao]|karaok[eê]|8d|reverb|versão|version|edit|bootleg|mashup|medley|cover)\b/i;
-const ALLOWED_GENRE = /hip|rap|trap|funk|brasil|brazil|urban|pop|r&b|soul|dance|electronic|eletr/i;
+/** O gênero oficial da Apple combina com alguma das categorias do artista? */
+function genreAllowed(artist: ArtistDef, genre: string): boolean {
+  return artist.categories.some((c) => CATEGORY_GENRES[c]?.test(genre));
+}
 
-// Nomes artísticos que contêm vírgula (ex.: "Ryu, The Runner") não podem ser divididos.
-const COMMA_NAMES = ARTISTS.filter((a) => a.name.includes(',')).map((a) => ({
-  re: new RegExp(a.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/,\s*/g, ',\\s*'), 'gi'),
-  safe: a.name.replace(/,/g, '\u201A'), // vírgula baixa (não é separador)
-}));
+// Nomes artísticos que contêm separadores (ex.: "Ryu, The Runner", "Jorge & Mateus",
+// "Zé Neto & Cristiano") não podem ser divididos — eles são protegidos antes da divisão.
+const ESC = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const PROTECTED_NAMES = ARTISTS.flatMap((a) => [a.name, ...(a.aliases ?? [])])
+  .filter((n) => SPLIT_ARTISTS.test(n))
+  .sort((a, b) => b.length - a.length)
+  .map((n) => new RegExp(ESC(n).replace(/\s+/g, '\\s+'), 'gi'));
 
 export function splitArtists(artistName: string): string[] {
+  const kept: string[] = [];
   let s = artistName;
-  for (const c of COMMA_NAMES) s = s.replace(c.re, c.safe);
+  for (const re of PROTECTED_NAMES) {
+    s = s.replace(re, (m) => {
+      kept.push(m);
+      return `\u0000${kept.length - 1}\u0000`;
+    });
+  }
   return s
     .split(SPLIT_ARTISTS)
-    .map((p) => p.replace(/\u201A/g, ',').trim())
+    .map((p) => p.replace(/\u0000(\d+)\u0000/g, (_, i) => kept[Number(i)]).trim())
     .filter(Boolean);
 }
 
@@ -94,7 +105,7 @@ export function processArtistResults(
       cand.set(s.artistId, c);
     }
     c.count++;
-    if (s.primaryGenreName && ALLOWED_GENRE.test(s.primaryGenreName)) c.allowed++;
+    if (s.primaryGenreName && genreAllowed(artist, s.primaryGenreName)) c.allowed++;
     if (s.primaryGenreName && !c.genres.includes(s.primaryGenreName)) c.genres.push(s.primaryGenreName);
     if (c.sampleTitles.length < 4) c.sampleTitles.push(s.trackName);
   }
@@ -122,7 +133,7 @@ export function processArtistResults(
           ...base, status: 'pendente',
           message: genreOk.length > 1
             ? `Há ${genreOk.length} artistas chamados "${artist.name}". Confirme qual é o correto.`
-            : `Nenhum perfil de "${artist.name}" com gênero de rap/trap/funk. Confirme manualmente.`,
+            : `Nenhum perfil de "${artist.name}" com o gênero esperado. Confirme manualmente.`,
         },
         tracks: [],
       };

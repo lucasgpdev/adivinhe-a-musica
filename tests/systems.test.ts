@@ -62,6 +62,10 @@ describe('catálogo (verificação)', () => {
   it('nomes com vírgula (Ryu, The Runner) não são divididos', () => {
     expect(splitArtists('Ryu, The Runner & Matuê')).toEqual(['Ryu, The Runner', 'Matuê']);
     expect(splitArtists('Teto, Matuê & WIU')).toEqual(['Teto', 'Matuê', 'WIU']);
+    expect(splitArtists('Jorge & Mateus')).toEqual(['Jorge & Mateus']);
+    expect(splitArtists('Zé Neto & Cristiano, Marília Mendonça')).toEqual(['Zé Neto & Cristiano', 'Marília Mendonça']);
+    expect(splitArtists('Henrique & Juliano & Jorge & Mateus')).toEqual(['Henrique & Juliano', 'Jorge & Mateus']);
+    expect(splitArtists('Pollo & Ananda')).toEqual(['Pollo', 'Ananda']);
   });
   it('detecção de variantes e limpeza de título', () => {
     expect(isVariant('Música (Sped Up)')).toBe(true);

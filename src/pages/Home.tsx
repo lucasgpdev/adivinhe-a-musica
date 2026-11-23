@@ -36,7 +36,7 @@ export function HomePage() {
           <Equalizer bars={22} height={160} className="gap-[6px] [&>span]:w-[8px]" />
         </div>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative max-w-2xl">
-          <Badge tone="accent" className="mb-6">Trap · Funk · Rap Nacional</Badge>
+          <Badge tone="accent" className="mb-6">Trap · Funk · Sertanejo · MPB · Pop · e muito mais</Badge>
           <Logo size="lg" />
           <p className="mt-6 max-w-xl text-lg text-zinc-400">
             Ouça o trecho, descubra a música e suba no ranking da turma. Prévias oficiais, nomes e artistas verificados.
