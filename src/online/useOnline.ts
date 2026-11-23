@@ -8,6 +8,7 @@ export type Team = 'A' | 'B';
 export interface RoomSettings {
   format: Format;
   categories: CategoryId[];
+  artists: string[];
   rounds: number;
   timeSec: number;
 }
@@ -43,6 +44,15 @@ export interface RoomState {
   answered: string[];
   question: { previewUrl: string; snippetStart: number; options: { id: string; title: string }[] } | null;
   reveal: RevealInfo | null;
+}
+
+export interface ChatMessage {
+  id: number;
+  at: number;
+  scope: 'all' | 'team';
+  team: Team | null;
+  from: { id: string; name: string; avatar: string; team: Team };
+  text: string;
 }
 
 export type ConnStatus = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'offline';
@@ -89,6 +99,7 @@ export function useOnline(profile: { name: string; avatar: string } | null) {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [receivedAt, setReceivedAt] = useState(0);
+  const [chat, setChat] = useState<ChatMessage[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const queue = useRef<object[]>([]);
   const ready = useRef(false);
@@ -142,6 +153,13 @@ export function useOnline(profile: { name: string; avatar: string } | null) {
         case 'left':
           storage()?.removeItem(ROOM_KEY);
           setRoom(null);
+          setChat([]);
+          break;
+        case 'chatHistory':
+          setChat((m.messages as ChatMessage[]) ?? []);
+          break;
+        case 'chat':
+          setChat((c) => [...c, m.message as ChatMessage].slice(-100));
           break;
         case 'error': {
           // sala antiga não existe mais (servidor reiniciou): esquece em silêncio
@@ -183,12 +201,14 @@ export function useOnline(profile: { name: string; avatar: string } | null) {
     status,
     room,
     receivedAt,
+    chat,
+    sendChat: (text: string, scope: 'all' | 'team') => send({ type: 'chat', text, scope }),
     error,
     clearError: () => setError(null),
     me: meId.current,
     create: (settings: RoomSettings) => send({ type: 'create', settings }),
     join: (code: string) => send({ type: 'join', code: code.trim().toUpperCase() }),
-    leave: () => { storage()?.removeItem(ROOM_KEY); send({ type: 'leave' }); setRoom(null); },
+    leave: () => { storage()?.removeItem(ROOM_KEY); send({ type: 'leave' }); setRoom(null); setChat([]); },
     setTeam: (team: Team) => send({ type: 'team', team }),
     updateSettings: (settings: Partial<RoomSettings>) => send({ type: 'settings', settings }),
     start: (questions: OnlineQuestion[]) => send({ type: 'start', questions }),

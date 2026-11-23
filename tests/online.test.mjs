@@ -158,3 +158,36 @@ describe('servidor online (WebSocket de verdade)', () => {
     friend.ws.close();
   });
 });
+
+describe('chat da sala', () => {
+  it('time só vê mensagens do próprio time; todos veem as gerais; anti-flood', () => {
+    let t = 0;
+    const r = new Room({ code: 'CH', now: () => t, schedule: () => null, cancel: () => {} });
+    r.join('a', 'Ana', 'x'); t++; r.join('b', 'Bia', 'x'); t++; r.join('c', 'Caio', 'x');
+    // a=A, b=B, c=A
+    const geral = r.chat('b', '  boa sorte  ', 'all').msg;
+    expect(geral.text).toBe('boa sorte');
+    const time = r.chat('a', 'vamos ganhar', 'team').msg;
+    expect(time.scope).toBe('team');
+    expect(r.canSee('c', time)).toBe(true);
+    expect(r.canSee('b', time)).toBe(false);
+    expect(r.chatFor('b').map((m) => m.text)).toEqual(['boa sorte']);
+    expect(r.chatFor('c').map((m) => m.text)).toEqual(['boa sorte', 'vamos ganhar']);
+    expect(r.chat('a', 'x'.repeat(500), 'all').msg.text).toHaveLength(200);
+    expect(r.chat('a', '   ', 'all').msg).toBeUndefined();
+    for (let i = 0; i < 3; i++) r.chat('a', `msg ${i}`, 'all');
+    expect(r.chat('a', 'flood', 'all').error).toMatch(/rápido/);
+    t += 7000;
+    expect(r.chat('a', 'de novo', 'all').msg).toBeTruthy();
+    // no todos contra todos, "team" vira mensagem geral
+    r.updateSettings('a', { format: 'ffa' });
+    expect(r.chat('c', 'ffa', 'team').msg.scope).toBe('all');
+  });
+
+  it('filtro de artistas nas configurações', () => {
+    const r = new Room({ code: 'AR', now: () => 0, schedule: () => null, cancel: () => {} });
+    r.join('a', 'Ana', 'x');
+    r.updateSettings('a', { artists: ['mc-tuto', 'mc-tuto', 'dj-arana', 7] });
+    expect(r.snapshot().settings.artists).toEqual(['mc-tuto', 'dj-arana']);
+  });
+});

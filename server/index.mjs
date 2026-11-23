@@ -85,6 +85,7 @@ export function startServer(port = Number(process.env.PORT ?? 3000)) {
       members.get(room.code).add(ws);
       send(ws, { type: 'joined', code: room.code, you: me.id });
       room.join(me.id, me.name, me.avatar);
+      send(ws, { type: 'chatHistory', messages: room.chatFor(me.id) });
     };
 
     ws.on('message', (raw) => {
@@ -123,6 +124,13 @@ export function startServer(port = Number(process.env.PORT ?? 3000)) {
         case 'start': err = room?.start(me.id, m.questions); break;
         case 'answer': room?.answer(me.id, m.round, m.optionId); break;
         case 'lobby': room?.backToLobby(me.id); break;
+        case 'chat': {
+          if (!room) break;
+          const r = room.chat(me.id, m.text, m.scope);
+          err = r.error;
+          if (r.msg) for (const other of members.get(room.code) ?? []) if (other.me?.id && room.canSee(other.me.id, r.msg)) send(other, { type: 'chat', message: r.msg });
+          break;
+        }
         default: break;
       }
       if (err) send(ws, { type: 'error', message: err });

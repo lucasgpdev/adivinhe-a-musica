@@ -3,7 +3,8 @@ import { useMemo, useState } from 'react';
 import { Icon } from '../components/Icon';
 import { Badge, Button, Chip, PageHeader, Segmented, Toggle } from '../components/ui';
 import { Avatar } from '../components/visuals';
-import { ARTISTS, CATEGORIES } from '../data/artists';
+import { ArtistSearch } from '../components/ArtistSearch';
+import { CATEGORIES } from '../data/artists';
 import { MODE_BY_ID } from '../data/modes';
 import { buildConfig, DEFAULT_CUSTOM, TIME_ADJUSTABLE, type CustomOptions } from '../game/config';
 import { distinctTitles, filterPool } from '../services/catalog';
@@ -37,7 +38,6 @@ export function SetupPage({ mode: modeId, playerIds: preset, context, category }
   const filters = { categories: effectiveCats, artists, extra };
   const pool = useMemo(() => filterPool(tracks, filters), [tracks, effectiveCats.join(), artists.join(), extra]); // eslint-disable-line react-hooks/exhaustive-deps
   const titles = distinctTitles(pool);
-  const artistCount = useMemo(() => Object.fromEntries(ARTISTS.map((a) => [a.id, tracks.filter((t) => t.artistId === a.id).length])), [tracks]);
   const needed = modeId === 'custom' ? custom.questions : mode.questions;
   const players = selected.map((id) => data.players.find((p) => p.id === id)).filter((p): p is NonNullable<typeof p> => !!p);
   const minP = modeId === 'custom' ? 1 : mode.minPlayers;
@@ -132,14 +132,7 @@ export function SetupPage({ mode: modeId, playerIds: preset, context, category }
               {enabledCats.map((c) => <Chip key={c.id} active={categories.includes(c.id)} onClick={() => setCategories(toggle(categories, c.id))}>{c.name}</Chip>)}
             </div>
             <div className="label mb-3 mt-6">Artistas {artists.length > 0 && <span className="normal-case tracking-normal text-zinc-400">· {artists.length} selecionado(s)</span>}</div>
-            <div className="flex flex-wrap gap-2">
-              <Chip active={!artists.length} onClick={() => setArtists([])}>Todos</Chip>
-              {ARTISTS.filter((a) => artistCount[a.id] > 0).map((a) => (
-                <Chip key={a.id} active={artists.includes(a.id)} onClick={() => setArtists(toggle(artists, a.id))}>
-                  {a.name} <span className="text-xs text-zinc-500">{artistCount[a.id]}</span>
-                </Chip>
-              ))}
-            </div>
+            <ArtistSearch tracks={tracks} selected={artists} onChange={setArtists} />
             <div className="label mb-3 mt-6">Seleção de músicas</div>
             <Segmented size="sm" value={extra} onChange={setExtra} options={EXTRA} />
           </section>

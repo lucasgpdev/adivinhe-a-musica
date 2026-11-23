@@ -19,7 +19,12 @@ export const GRACE_MS = 600;
 export const NAME_MAX = 24;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-export const DEFAULT_SETTINGS = { format: 'teams', categories: [], rounds: 10, timeSec: 15 };
+export const DEFAULT_SETTINGS = { format: 'teams', categories: [], artists: [], rounds: 10, timeSec: 15 };
+export const CHAT_MAX = 200;
+export const CHAT_HISTORY = 60;
+/** Anti-flood: no máximo CHAT_BURST mensagens a cada CHAT_WINDOW_MS por jogador. */
+export const CHAT_BURST = 5;
+export const CHAT_WINDOW_MS = 6000;
 
 /** Pontos de um acerto: 500 fixos + até 500 pela velocidade. */
 export function pointsFor(timeMs, totalMs) {
@@ -36,6 +41,7 @@ export function sanitizeSettings(s, prev = DEFAULT_SETTINGS) {
   const out = { ...prev };
   if (s && (s.format === 'teams' || s.format === 'ffa')) out.format = s.format;
   if (s && Array.isArray(s.categories)) out.categories = s.categories.filter((c) => typeof c === 'string').slice(0, 20);
+  if (s && Array.isArray(s.artists)) out.artists = [...new Set(s.artists.filter((c) => typeof c === 'string').map((c) => c.slice(0, 64)))].slice(0, 60);
   if (s && Number.isFinite(s.rounds)) out.rounds = Math.max(5, Math.min(30, Math.round(s.rounds)));
   if (s && Number.isFinite(s.timeSec)) out.timeSec = Math.max(5, Math.min(30, Math.round(s.timeSec)));
   return out;
@@ -82,6 +88,41 @@ export class Room {
     this.lastReveal = null;
     this.timer = null;
     this.emptySince = null;
+    /** @type {{id:number, at:number, scope:'all'|'team', team:string|null, from:{id:string,name:string,avatar:string,team:string}, text:string}[]} */
+    this.chatLog = [];
+    this.chatSeq = 0;
+    this.chatTimes = new Map(); // playerId → timestamps recentes
+  }
+
+  /**
+   * Mensagem de chat. scope "team" só chega aos colegas de time (no modo times).
+   * Retorna { msg } ou { error }.
+   */
+  chat(id, rawText, scope) {
+    const p = this.players.get(id);
+    if (!p) return { error: 'Você não está na sala.' };
+    const text = String(rawText ?? '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
+    if (!text) return { error: null };
+    const now = this.now();
+    const recent = (this.chatTimes.get(id) ?? []).filter((t) => now - t < CHAT_WINDOW_MS);
+    if (recent.length >= CHAT_BURST) return { error: 'Calma! Você está mandando mensagens rápido demais.' };
+    recent.push(now);
+    this.chatTimes.set(id, recent);
+    const team = scope === 'team' && this.settings.format === 'teams' ? p.team : null;
+    const msg = { id: ++this.chatSeq, at: now, scope: team ? 'team' : 'all', team, from: { id: p.id, name: p.name, avatar: p.avatar, team: p.team }, text };
+    this.chatLog.push(msg);
+    if (this.chatLog.length > CHAT_HISTORY) this.chatLog.shift();
+    return { msg };
+  }
+
+  /** Quem pode ver esta mensagem? */
+  canSee(playerId, msg) {
+    if (msg.scope === 'all') return true;
+    return this.players.get(playerId)?.team === msg.team;
+  }
+
+  chatFor(playerId) {
+    return this.chatLog.filter((m) => this.canSee(playerId, m));
   }
 
   get connectedCount() {

@@ -16,9 +16,9 @@ export interface OnlineQuestion {
  * Mistura dificuldades 1–3 e evita repetir o mesmo título.
  */
 export function buildOnlineQuestions(
-  tracks: Track[], categories: CategoryId[], rounds: number, rng: () => number = Math.random,
+  tracks: Track[], categories: CategoryId[], rounds: number, rng: () => number = Math.random, artists: string[] = [],
 ): OnlineQuestion[] {
-  const pool = filterPool(tracks, { categories, artists: [], extra: 'random' }, new Date());
+  const pool = filterPool(tracks, { categories, artists, extra: 'random' }, new Date());
   const all = tracks;
   const used = new Set<string>();
   const out: OnlineQuestion[] = [];
