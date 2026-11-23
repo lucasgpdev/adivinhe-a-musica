@@ -9,7 +9,8 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { ARTISTS, CATEGORY_GENRES } from '../src/data/artists';
+import { ARTIST_BY_ID, ARTISTS, CATEGORY_GENRES } from '../src/data/artists';
+import { applyFeatured, FEATURED_SONGS } from '../src/data/featured';
 import { EMPTY_CATALOG, markHits, processArtistResults } from '../src/services/catalog';
 import type { ItunesResponse, ItunesTrack } from '../src/services/itunes';
 import type { Catalog, Track } from '../src/types';
@@ -24,10 +25,11 @@ if (!process.env.RENDER && !process.env.BUILD_CATALOG) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function search(name: string): Promise<ItunesTrack[]> {
+async function search(name: string, byArtist = true): Promise<ItunesTrack[]> {
   const q = new URLSearchParams({
-    term: name, country: 'BR', media: 'music', entity: 'song', attribute: 'artistTerm', limit: '200', explicit: 'Yes',
+    term: name, country: 'BR', media: 'music', entity: 'song', limit: '200', explicit: 'Yes',
   });
+  if (byArtist) q.set('attribute', 'artistTerm');
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const res = await fetch(`https://itunes.apple.com/search?${q}`, { signal: AbortSignal.timeout(20000) });
@@ -70,9 +72,30 @@ async function main() {
   }
   const uniq = new Map<number, Track>();
   for (const t of tracks) if (!uniq.has(t.trackId)) uniq.set(t.trackId, t);
-  const catalog: Catalog = {
-    ...EMPTY_CATALOG, syncedAt: new Date().toISOString(), artists, tracks: markHits([...uniq.values()]),
-  };
+  let all = markHits([...uniq.values()]);
+
+  // Músicas em destaque: se não vieram na busca do artista, procura pelo título.
+  for (const f of FEATURED_SONGS) {
+    const a = ARTIST_BY_ID[f.artistId];
+    if (!a) continue;
+    const found = applyFeatured(all, [f]);
+    if (found.missing.length) {
+      await sleep(INTERVAL_MS);
+      try {
+        const results = (await search(`${a.name} ${f.title}`, false));
+        const confirmed = artists[a.id]?.appleArtistId ? [artists[a.id].appleArtistId!] : undefined;
+        const extra = processArtistResults(a, results, confirmed).tracks.filter((t) => !all.some((x) => x.trackId === t.trackId));
+        all = all.concat(markHits(extra));
+      } catch (e) {
+        console.log(`[catálogo] destaque "${f.title}": erro — ${(e as Error).message}`);
+      }
+    }
+    const r = applyFeatured(all, [f]);
+    all = r.tracks;
+    console.log(`[catálogo] destaque ${a.name} - "${f.title}": ${r.missing.length ? 'NÃO encontrada em versão limpa com prévia' : 'ok'}`);
+  }
+
+  const catalog: Catalog = { ...EMPTY_CATALOG, syncedAt: new Date().toISOString(), artists, tracks: all };
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, JSON.stringify(catalog));
   const perCat: Record<string, number> = {};

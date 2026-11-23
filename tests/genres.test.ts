@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ARTISTS, ALL_CATEGORY_IDS, CATEGORIES } from '../src/data/artists';
 import { markHits } from '../src/services/catalog';
+import { applyFeatured, FEATURED_SONGS } from '../src/data/featured';
+import { ARTIST_BY_ID } from '../src/data/artists';
 import { fakeTrack } from './fixtures';
 import { migrate } from '../src/state/defaults';
 
@@ -42,6 +44,20 @@ describe('gêneros', () => {
     expect(velha.categories).not.toContain('submundo');
     expect(outro.categories).not.toContain('submundo');
     expect(ARTISTS.filter((a) => a.submundo).length).toBeGreaterThanOrEqual(10);
+  });
+
+  it('músicas em destaque entram nas categorias pedidas (ex.: "2026" do MC Tuto)', () => {
+    for (const f of FEATURED_SONGS) expect(ARTIST_BY_ID[f.artistId], f.artistId).toBeTruthy();
+    const base = fakeTrack(3, 'mc-tuto', 3, ['funk']);
+    const tracks = markHits([
+      { ...base, title: '2026', displayTitle: '2026', artistName: 'MC Tuto & DJ Oreia', rankInArtist: 40, year: 2025 },
+      { ...base, trackId: 9, id: 'itunes:9', title: 'Outra', displayTitle: 'Outra', year: 2015 },
+    ], new Date('2026-11-23'));
+    const r = applyFeatured(tracks, [{ artistId: 'mc-tuto', title: '2026', categories: ['tiktok', 'funk'] }]);
+    expect(r.missing).toHaveLength(0);
+    expect(r.tracks[0].categories).toEqual(expect.arrayContaining(['funk', 'tiktok']));
+    expect(r.tracks[1].categories).not.toContain('tiktok');
+    expect(applyFeatured(tracks, [{ artistId: 'mc-tuto', title: 'Não existe', categories: ['tiktok'] }]).missing).toHaveLength(1);
   });
 
   it('ids de artistas são únicos', () => {

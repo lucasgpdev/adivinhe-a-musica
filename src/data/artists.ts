@@ -152,6 +152,7 @@ export const ARTISTS: ArtistDef[] = [
   { id: 'mc-tuto', name: 'MC Tuto', categories: ['funk'], tiktok: true },
   { id: 'mari-fernandez', name: 'Mari Fernandez', categories: ['forro', 'sofrencia'], tiktok: true },
   { id: 'dj-arana', name: 'DJ Arana', categories: ['funk'], tiktok: true },
+  { id: 'dj-oreia', name: 'DJ Oreia', aliases: ['dj oreia', 'oreia'], categories: ['funk'], tiktok: true },
 
   // ── Submundo 808 (funk mandelão de Campinas) — entram só as de 2024 em diante ──
   { id: 'submundo-808', name: 'Submundo 808', aliases: ['submundo808'], categories: ['funk'], submundo: true },
