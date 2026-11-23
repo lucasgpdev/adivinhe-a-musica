@@ -43,7 +43,7 @@ function serveStatic(req, res) {
 export function startServer(port = Number(process.env.PORT ?? 3000)) {
   const lobby = new Lobby();
   const server = createServer(serveStatic);
-  const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 512 * 1024 });
+  const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1536 * 1024 });
   /** @type {Map<string, Set<import('ws').WebSocket>>} sockets por sala */
   const members = new Map();
 
@@ -126,7 +126,7 @@ export function startServer(port = Number(process.env.PORT ?? 3000)) {
         case 'lobby': room?.backToLobby(me.id); break;
         case 'chat': {
           if (!room) break;
-          const r = room.chat(me.id, m.text, m.scope);
+          const r = room.chat(me.id, { text: m.text, kind: m.kind, media: m.media, stickerId: m.stickerId, durationSec: m.durationSec, replyTo: m.replyTo }, m.scope);
           err = r.error;
           if (r.msg) for (const other of members.get(room.code) ?? []) if (other.me?.id && room.canSee(other.me.id, r.msg)) send(other, { type: 'chat', message: r.msg });
           break;

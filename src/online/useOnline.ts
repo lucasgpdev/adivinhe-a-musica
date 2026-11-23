@@ -54,7 +54,23 @@ export interface ChatMessage {
   scope: 'all' | 'team';
   team: Team | null;
   from: { id: string; name: string; avatar: string; team: Team };
+  kind?: 'text' | 'image' | 'audio' | 'sticker';
   text: string;
+  /** data URL da foto/áudio/figurinha criada pelo jogador (null quando expirou na sala). */
+  media?: string | null;
+  stickerId?: string | null;
+  durationSec?: number;
+  expired?: boolean;
+  replyTo?: { id: number; name: string; kind: string; preview: string } | null;
+}
+
+export interface ChatOutgoing {
+  kind?: 'text' | 'image' | 'audio' | 'sticker';
+  text?: string;
+  media?: string;
+  stickerId?: string;
+  durationSec?: number;
+  replyTo?: number;
 }
 
 export type ConnStatus = 'idle' | 'connecting' | 'online' | 'reconnecting' | 'offline';
@@ -204,7 +220,7 @@ export function useOnline(profile: { name: string; avatar: string } | null) {
     room,
     receivedAt,
     chat,
-    sendChat: (text: string, scope: 'all' | 'team') => send({ type: 'chat', text, scope }),
+    sendChat: (msg: ChatOutgoing, scope: 'all' | 'team') => send({ type: 'chat', ...msg, scope }),
     error,
     clearError: () => setError(null),
     me: meId.current,

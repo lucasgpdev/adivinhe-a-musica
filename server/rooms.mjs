@@ -25,6 +25,20 @@ export const CHAT_HISTORY = 60;
 /** Anti-flood: no máximo CHAT_BURST mensagens a cada CHAT_WINDOW_MS por jogador. */
 export const CHAT_BURST = 5;
 export const CHAT_WINDOW_MS = 6000;
+/** Fotos, áudios e figurinhas: tamanho máximo do arquivo (data URL) e memória total por sala. */
+export const MEDIA_MAX = 900 * 1024;
+export const ROOM_MEDIA_BUDGET = 12 * 1024 * 1024;
+const MEDIA_TYPES = {
+  image: /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/,
+  sticker: /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/,
+  audio: /^data:audio\/(webm|ogg|mp4|mpeg|aac|x-m4a)(;codecs=[a-z0-9.]+)?;base64,[A-Za-z0-9+/=]+$/,
+};
+/** Figurinhas do pacote do jogo (o desenho fica no cliente). */
+export const BUILTIN_STICKERS = new Set([
+  'kkkk', 'acertei', 'errei', 'facil', 'fogo', 'chorando', 'pensando', 'dancando', 'gg', 'bora', 'sus', 'brabo',
+  'coracao', 'raiva', 'chocado', 'dormindo',
+]);
+const kindLabel = { text: '', image: '📷 Foto', audio: '🎤 Áudio', sticker: 'Figurinha' };
 
 /** Pontos de um acerto: 500 fixos + até 500 pela velocidade. */
 export function pointsFor(timeMs, totalMs) {
@@ -99,20 +113,54 @@ export class Room {
    * Mensagem de chat. scope "team" só chega aos colegas de time (no modo times).
    * Retorna { msg } ou { error }.
    */
-  chat(id, rawText, scope) {
+  /**
+   * Mensagem de chat (estilo WhatsApp). scope "team" só chega aos colegas de time (no modo times).
+   * input: { text?, kind?: 'text'|'image'|'audio'|'sticker', media?, stickerId?, durationSec?, replyTo? }
+   * Retorna { msg } ou { error }.
+   */
+  chat(id, input, scope) {
     const p = this.players.get(id);
     if (!p) return { error: 'Você não está na sala.' };
-    const text = String(rawText ?? '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
-    if (!text) return { error: null };
+    const m = typeof input === 'string' ? { text: input } : (input ?? {});
+    const kind = ['image', 'audio', 'sticker'].includes(m.kind) ? m.kind : 'text';
+    const text = String(m.text ?? '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
+    let media = null;
+    let stickerId = null;
+    if (kind === 'sticker' && typeof m.stickerId === 'string') {
+      if (!BUILTIN_STICKERS.has(m.stickerId)) return { error: 'Figurinha desconhecida.' };
+      stickerId = m.stickerId;
+    } else if (kind !== 'text') {
+      media = typeof m.media === 'string' ? m.media : '';
+      if (media.length > MEDIA_MAX) return { error: kind === 'audio' ? 'Áudio grande demais (máx. 1 minuto).' : 'Imagem grande demais.' };
+      if (!MEDIA_TYPES[kind].test(media)) return { error: 'Formato de arquivo não aceito.' };
+    } else if (!text) return { error: null };
+
     const now = this.now();
     const recent = (this.chatTimes.get(id) ?? []).filter((t) => now - t < CHAT_WINDOW_MS);
     if (recent.length >= CHAT_BURST) return { error: 'Calma! Você está mandando mensagens rápido demais.' };
     recent.push(now);
     this.chatTimes.set(id, recent);
+
     const team = scope === 'team' && this.settings.format === 'teams' ? p.team : null;
-    const msg = { id: ++this.chatSeq, at: now, scope: team ? 'team' : 'all', team, from: { id: p.id, name: p.name, avatar: p.avatar, team: p.team }, text };
+    let replyTo = null;
+    const orig = Number.isFinite(m.replyTo) ? this.chatLog.find((x) => x.id === m.replyTo) : null;
+    if (orig && (orig.scope === 'all' || orig.team === team)) {
+      replyTo = { id: orig.id, name: orig.from.name, kind: orig.kind ?? 'text', preview: (orig.text || kindLabel[orig.kind ?? 'text']).slice(0, 80) };
+    }
+    const msg = {
+      id: ++this.chatSeq, at: now, scope: team ? 'team' : 'all', team,
+      from: { id: p.id, name: p.name, avatar: p.avatar, team: p.team },
+      kind, text, media, stickerId, replyTo,
+      durationSec: kind === 'audio' && Number.isFinite(m.durationSec) ? Math.max(0, Math.min(60, Math.round(m.durationSec))) : undefined,
+    };
     this.chatLog.push(msg);
     if (this.chatLog.length > CHAT_HISTORY) this.chatLog.shift();
+    // limita a memória de fotos/áudios da sala: as mídias mais antigas viram "expirada"
+    let total = this.chatLog.reduce((n, x) => n + (x.media?.length ?? 0), 0);
+    for (const x of this.chatLog) {
+      if (total <= ROOM_MEDIA_BUDGET) break;
+      if (x.media) { total -= x.media.length; x.media = null; x.expired = true; }
+    }
     return { msg };
   }
 

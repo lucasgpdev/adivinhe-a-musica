@@ -194,3 +194,35 @@ describe('chat da sala', () => {
     expect(r.snapshot().settings.artists).toEqual(['mc-tuto', 'dj-arana']);
   });
 });
+
+describe('chat estilo WhatsApp', () => {
+  const mk = () => {
+    const r = new Room({ code: 'WA', now: () => 0, schedule: () => null, cancel: () => {} });
+    r.join('a', 'Ana', 'x'); r.join('b', 'Bia', 'x');
+    return r;
+  };
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+  it('foto, áudio e figurinha válidos; formatos perigosos recusados', () => {
+    const r = mk();
+    expect(r.chat('a', { kind: 'image', media: png }, 'all').msg.kind).toBe('image');
+    const au = r.chat('b', { kind: 'audio', media: 'data:audio/webm;codecs=opus;base64,GkXfow==', durationSec: 7.4 }, 'all').msg;
+    expect(au.durationSec).toBe(7);
+    expect(r.chat('a', { kind: 'sticker', stickerId: 'kkkk' }, 'all').msg.stickerId).toBe('kkkk');
+    const s2 = new Room({ code: 'W2', now: () => 0, schedule: () => null, cancel: () => {} });
+    s2.join('a', 'Ana', 'x');
+    expect(s2.chat('a', { kind: 'image', media: 'data:image/svg+xml;base64,PHN2Zz4=' }, 'all').error).toMatch(/Formato/);
+    expect(s2.chat('a', { kind: 'image', media: 'javascript:alert(1)' }, 'all').error).toMatch(/Formato/);
+    expect(s2.chat('a', { kind: 'sticker', stickerId: 'nao-existe' }, 'all').error).toMatch(/desconhecida/);
+    expect(s2.chat('a', { kind: 'image', media: 'data:image/png;base64,' + 'A'.repeat(1000 * 1024) }, 'all').error).toMatch(/grande/);
+  });
+  it('responder cita a mensagem original; não vaza mensagem de time para quem não é do time', () => {
+    const r = mk();
+    const orig = r.chat('a', 'quem canta essa?', 'all').msg;
+    const resp = r.chat('b', { text: 'é o MC Tuto', replyTo: orig.id }, 'all').msg;
+    expect(resp.replyTo).toEqual({ id: orig.id, name: 'Ana', kind: 'text', preview: 'quem canta essa?' });
+    const foto = r.chat('a', { kind: 'image', media: png }, 'all').msg;
+    expect(r.chat('b', { text: 'kkk', replyTo: foto.id }, 'all').msg.replyTo.preview).toBe('📷 Foto');
+    const segredo = r.chat('a', 'segredo do time', 'team').msg; // a = time A
+    expect(r.chat('b', { text: 'hm', replyTo: segredo.id }, 'all').msg.replyTo).toBeNull();
+  });
+});

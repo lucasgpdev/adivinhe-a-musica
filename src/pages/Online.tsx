@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  ArrowRight, Check, Copy, Crown, Globe, LogOut, MessageCircle, Play, RotateCcw, Search, Send, Shuffle, Swords, Users, Volume2, Wifi, WifiOff, X,
+  ArrowRight, Check, Copy, Crown, Globe, LogOut, Play, RotateCcw, Search, Shuffle, Swords, Users, Volume2, Wifi, WifiOff, X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AudioEngine } from '../audio/AudioEngine';
@@ -10,6 +10,7 @@ import { Badge, Button, Chip, PageHeader, Segmented, Spinner, Toggle } from '../
 import { Avatar, Confetti, Equalizer, Podium, TimerRing } from '../components/visuals';
 import { AVATARS } from '../data/cosmetics';
 import { CATEGORIES } from '../data/artists';
+import { ChatPanel } from '../online/ChatPanel';
 import { buildOnlineQuestions } from '../online/questions';
 import {
   loadProfile, onlineAvailable, saveProfile, useOnline, type OnlinePlayer, type RoomState, type Team,
@@ -21,7 +22,7 @@ import { cx, fmtNumber } from '../utils';
 
 const NAME_MAX = 24;
 const LETTERS = ['A', 'B', 'C', 'D'];
-const TEAM_STYLE: Record<Team, { name: string; text: string; border: string; bg: string; dot: string }> = {
+export const TEAM_STYLE: Record<Team, { name: string; text: string; border: string; bg: string; dot: string }> = {
   A: { name: 'Time Roxo', text: 'text-fuchsia-300', border: 'border-fuchsia-400/40', bg: 'bg-fuchsia-500/10', dot: 'bg-fuchsia-400' },
   B: { name: 'Time Azul', text: 'text-sky-300', border: 'border-sky-400/40', bg: 'bg-sky-500/10', dot: 'bg-sky-400' },
 };
@@ -76,95 +77,7 @@ export function OnlinePage({ code: inviteCode }: { code?: string }) {
   );
 }
 
-// ─── Chat ────────────────────────────────────────────────────
-
-function ChatPanel({ room, online, open, setOpen }: { room: RoomState; online: Online; open: boolean; setOpen: (v: boolean) => void }) {
-  const teams = room.settings.format === 'teams';
-  const me = room.players.find((p) => p.id === online.me);
-  const [tab, setTab] = useState<'all' | 'team'>('all');
-  const [text, setText] = useState('');
-  const [seen, setSeen] = useState(0);
-  const listRef = useRef<HTMLDivElement>(null);
-  const scope = teams ? tab : 'all';
-  const shown = online.chat.filter((m) => (scope === 'team' ? m.scope === 'team' : m.scope === 'all'));
-  const lastId = online.chat.length ? online.chat[online.chat.length - 1].id : 0;
-  const unread = open ? 0 : online.chat.filter((m) => m.id > seen && m.from.id !== online.me).length;
-
-  useEffect(() => { if (open) setSeen(lastId); }, [open, lastId]);
-  useEffect(() => {
-    const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [shown.length, open, tab]);
-  useEffect(() => {
-    const last = online.chat[online.chat.length - 1];
-    if (last && last.from.id !== online.me && !open) sfx.click();
-  }, [lastId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const send = () => {
-    const t = text.trim();
-    if (!t) return;
-    online.sendChat(t, scope);
-    setText('');
-  };
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)} aria-label="Abrir chat"
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-accent px-4 py-3 font-semibold text-white shadow-glow"
-      >
-        <MessageCircle size={20} /> Chat
-        {unread > 0 && <span className="rounded-full bg-white px-1.5 text-xs font-bold text-accent">{unread}</span>}
-      </button>
-    );
-  }
-  return (
-    <div className="fixed bottom-4 right-4 z-40 flex h-[420px] w-[calc(100vw-2rem)] max-w-[340px] flex-col xl:bottom-6 xl:top-24 xl:h-auto overflow-hidden rounded-2xl border border-white/10 bg-ink-950/95 shadow-2xl backdrop-blur-xl">
-      <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
-        <MessageCircle size={16} className="text-accent-soft" />
-        {teams ? (
-          <div className="flex gap-1">
-            <button onClick={() => setTab('all')} className={cx('rounded-lg px-2.5 py-1 text-xs font-semibold', tab === 'all' ? 'bg-white/10 text-white' : 'text-zinc-400')}>Todos</button>
-            <button onClick={() => setTab('team')} className={cx('rounded-lg px-2.5 py-1 text-xs font-semibold', tab === 'team' ? cx(TEAM_STYLE[me?.team ?? 'A'].bg, TEAM_STYLE[me?.team ?? 'A'].text) : 'text-zinc-400')}>
-              Meu time{me ? ` (${TEAM_STYLE[me.team].name.replace('Time ', '')})` : ''}
-            </button>
-          </div>
-        ) : <span className="text-sm font-semibold">Chat da sala</span>}
-        <button onClick={() => setOpen(false)} aria-label="Fechar chat" className="ml-auto text-zinc-400 hover:text-white"><X size={16} /></button>
-      </div>
-      <div ref={listRef} className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
-        {!shown.length && (
-          <p className="pt-10 text-center text-sm text-zinc-500">
-            {scope === 'team' ? 'Só o seu time vê as mensagens daqui. Combine a estratégia!' : 'Mande um oi para a sala!'}
-          </p>
-        )}
-        {shown.map((m) => {
-          const mine = m.from.id === online.me;
-          return (
-            <div key={m.id} className={cx('flex gap-2', mine && 'flex-row-reverse')}>
-              <Avatar id={m.from.avatar} size={24} />
-              <div className={cx('max-w-[80%] rounded-2xl px-3 py-1.5 text-sm', mine ? 'bg-accent/25' : 'bg-white/[0.06]')}>
-                {!mine && (
-                  <div className={cx('text-[11px] font-semibold', teams ? TEAM_STYLE[m.from.team].text : 'text-zinc-400')}>{m.from.name}</div>
-                )}
-                <div className="whitespace-pre-wrap break-words">{m.text}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <form className="flex gap-2 border-t border-white/10 p-2" onSubmit={(e) => { e.preventDefault(); send(); }}>
-        <input
-          className="input h-10 flex-1 py-0 text-sm" value={text} maxLength={200} onChange={(e) => setText(e.target.value)}
-          placeholder={scope === 'team' ? 'Mensagem para o seu time…' : 'Mensagem para todos…'} aria-label="Mensagem do chat"
-        />
-        <button type="submit" disabled={!text.trim()} aria-label="Enviar" className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-white disabled:opacity-40"><Send size={16} /></button>
-      </form>
-    </div>
-  );
-}
-
-type Online = ReturnType<typeof useOnline>;
+export type Online = ReturnType<typeof useOnline>;
 
 // ─── Nome e avatar ───────────────────────────────────────────
 
