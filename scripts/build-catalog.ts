@@ -52,8 +52,47 @@ async function search(name: string, byArtist = true, country = 'BR'): Promise<It
 const rawExplicitness: Record<string, number> = {};
 let usExplicit = 0;
 
+async function get(url: string): Promise<ItunesTrack[]> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return ((await res.json()) as ItunesResponse).results;
+}
+
+/** Diagnóstico: de onde a Apple devolve as versões explícitas? */
+async function diagnoseExplicit() {
+  const dist = (rs: ItunesTrack[]) => {
+    const d: Record<string, number> = {};
+    for (const r of rs) if (r.wrapperType === 'track') d[r.trackExplicitness ?? '?'] = (d[r.trackExplicitness ?? '?'] ?? 0) + 1;
+    return JSON.stringify(d);
+  };
+  try {
+    const probe = await get('https://itunes.apple.com/search?term=MC+Ryan+SP&country=BR&entity=song&limit=5');
+    const id = probe.find((r) => /ryan/i.test(r.artistName))?.artistId;
+    console.log(`[diagnóstico] artistId MC Ryan SP = ${id}`);
+    const urls: Record<string, string> = {
+      'lookup BR': `https://itunes.apple.com/lookup?id=${id}&entity=song&limit=200&country=BR`,
+      'lookup US': `https://itunes.apple.com/lookup?id=${id}&entity=song&limit=200&country=US`,
+      'lookup BR explicit=Yes': `https://itunes.apple.com/lookup?id=${id}&entity=song&limit=200&country=BR&explicit=Yes`,
+      'search musicTrack': 'https://itunes.apple.com/search?term=MC+Ryan+SP&country=BR&media=music&entity=musicTrack&limit=200&explicit=Yes',
+      'search sem explicit': 'https://itunes.apple.com/search?term=MC+Ryan+SP&country=BR&media=music&entity=song&limit=200',
+      'album lookup': `https://itunes.apple.com/lookup?id=${id}&entity=album&limit=50&country=BR`,
+    };
+    for (const [k, u] of Object.entries(urls)) {
+      await sleep(INTERVAL_MS);
+      const rs = await get(u);
+      const albums = rs.filter((r) => (r as unknown as { collectionExplicitness?: string }).collectionExplicitness);
+      const adist: Record<string, number> = {};
+      for (const a of albums) { const e = (a as unknown as { collectionExplicitness: string }).collectionExplicitness; adist[e] = (adist[e] ?? 0) + 1; }
+      console.log(`[diagnóstico] ${k}: faixas ${dist(rs)} · álbuns ${JSON.stringify(adist)}`);
+    }
+  } catch (e) {
+    console.log(`[diagnóstico] erro: ${(e as Error).message}`);
+  }
+}
+
 async function main() {
   const started = Date.now();
+  await diagnoseExplicit();
   const artists: Catalog['artists'] = {};
   let tracks: Track[] = [];
   for (const [i, a] of ARTISTS.entries()) {
