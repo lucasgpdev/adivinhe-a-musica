@@ -54,26 +54,26 @@ Não usa servidor nem banco de dados online: tudo fica salvo no navegador desse 
 
 **Teclado:** `1–4` ou `A–D` respondem · `Espaço` toca/pausa a música · `Enter` avança.
 
-## 4. Ranking, campeonato e painel
+## 4. Jogar online com amigos
 
-- **Ranking:** geral, do dia, da semana e do mês, por categoria e por artista, com pódio e histórico de cada jogador. Critérios: pontuação, depois aproveitamento, depois acertos.
-- **Campeonato da Turma** tem três fases:
-  - **Classificatória:** todos ouvem as mesmas músicas e cada um joga uma vez só.
-  - **Semifinais** (1º × 4º e 2º × 3º).
-  - **Final** com músicas difíceis, seguida da tela do campeão com o pódio.
+1. Clique em **Jogar online**, digite seu nome e escolha um avatar.
+2. **Criar sala**: você vira o dono e recebe um código de 4 letras (ex.: `K7Q2`) e um link de convite.
+3. Os amigos entram com o código (ou abrindo o link) e escolhem o time.
+4. O dono escolhe o formato — **Times** (Time Roxo × Time Azul, de 1v1 até 4v4) ou **Todos contra todos** (até 8) —, os gêneros, a quantidade de músicas e o tempo.
+5. Todos ouvem a mesma música ao mesmo tempo. Acerto vale 500 pontos + até 500 pela velocidade. Nos times, os pontos de cada jogador somam para o time.
 
-  Campeonatos antigos ficam guardados no **Hall da Fama**.
-- **Fila:** adicione participantes, sorteie a ordem, reorganize e chame o próximo jogador.
-- **Modo apresentador** (ícone de tela no topo): letras maiores para o projetor. A partida só avança quando o professor clica.
-- **Painel do professor** reúne:
-  - lista de participantes (arquivar e restaurar);
-  - catálogo musical;
-  - configurações: tempo, categorias, mecânicas e efeitos;
-  - PIN opcional;
-  - exportar e importar JSON;
-  - backups automáticos;
-  - registro de todas as ações administrativas.
-- **Segurança dos dados:** antes de importar, restaurar, reiniciar uma fase ou apagar dados, o jogo cria um backup automático. Ações destrutivas pedem que você digite uma palavra de confirmação. Resultados de partidas nunca são editados.
+Se a internet cair, o jogo reconecta sozinho e volta para a mesma sala.
+
+As músicas são buscadas na Apple Music durante a publicação no Render (`scripts/build-catalog.ts`) e entregues prontas em `catalog.json` — não é mais preciso sincronizar nada.
+
+### Rodando localmente
+
+```
+npm install
+npm run catalog   # opcional: baixa as músicas (~7 min)
+npm run build
+npm start         # http://localhost:3000
+```
 
 ## 5. Para desenvolvedores
 

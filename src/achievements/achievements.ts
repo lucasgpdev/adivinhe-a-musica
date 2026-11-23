@@ -57,8 +57,6 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     condition: 'Sobreviva 10 rodadas', progress: (s) => ({ current: s.survivalBest, target: 10 }) },
   { id: 'first-place', name: 'Primeiro Lugar', icon: 'crown', description: 'Topo do ranking geral.',
     condition: 'Fique em 1º no ranking geral', progress: (s) => bool(s.isTop1) },
-  { id: 'legend', name: 'Lenda da Turma', icon: 'trophy', description: 'Campeão do campeonato da turma.',
-    condition: 'Vença um Campeonato da Turma', progress: (s) => ({ current: s.championshipsWon, target: 1 }) },
 ];
 
 export const ACHIEVEMENT_BY_ID: Record<string, AchievementDef> = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));

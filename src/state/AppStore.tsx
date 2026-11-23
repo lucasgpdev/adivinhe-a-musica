@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { computePlayerStats, evaluateAchievements } from '../achievements/achievements';
 import { setSfxEnabled } from '../audio/sfx';
-import { recordBout, recordQualifying, decideBout } from '../championship/championship';
 import { THEME_BY_ID } from '../data/cosmetics';
 import type { SessionConfig, Session } from '../game/session';
 import { toMatchRecords } from '../game/session';
@@ -9,7 +8,6 @@ import { previousBest, topPlayerId } from '../ranking/ranking';
 import { EMPTY_CATALOG, usableTracks } from '../services/catalog';
 import { createBackup, loadCatalog, loadData, requestPersistence, saveCatalog, saveData } from '../storage/db';
 import type { AppData, Catalog, CategoryId, MatchRecord, ModeId, Player, Track } from '../types';
-import { makeRng } from '../utils';
 import { migrate } from './defaults';
 
 // ─── Rotas ───────────────────────────────────────────────────
@@ -43,11 +41,10 @@ export type Route =
   | { name: 'result'; result: GameResultInfo }
   | { name: 'ranking' }
   | { name: 'hall' }
-  | { name: 'championship'; id?: string }
+  | { name: 'online'; code?: string }
   | { name: 'achievements' }
-  | { name: 'profile' }
-  | { name: 'teacher' }
-  | { name: 'queue' };
+  | { name: 'profile' };
+
 
 export interface Toast {
   id: number;
@@ -76,9 +73,8 @@ interface Store {
   backup: (reason: string) => Promise<void>;
   finishGame: (session: Session, launch: GameLaunch) => GameResultInfo;
   replaceAll: (d: AppData, reason: string) => Promise<void>;
-  /** Painel do professor desbloqueado nesta sessão (quando há PIN). */
-  teacherUnlocked: boolean;
-  setTeacherUnlocked: (v: boolean) => void;
+  /** Situação do catálogo baixado do servidor. */
+  catalogStatus: 'loading' | 'ready' | 'unavailable';
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -93,7 +89,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [data, setData] = useState<AppData>(() => migrate(undefined));
   const [catalog, setCatalog] = useState<Catalog>(EMPTY_CATALOG);
-  const [route, setRoute] = useState<Route>({ name: 'home' });
+  const [route, setRoute] = useState<Route>(() => {
+    // link de convite: ...?sala=K7Q2
+    try {
+      const code = new URLSearchParams(location.search).get('sala');
+      if (code) return { name: 'online', code: code.toUpperCase().slice(0, 4) };
+    } catch { /* ignore */ }
+    return { name: 'home' };
+  });
+  const [catalogStatus, setCatalogStatus] = useState<Store['catalogStatus']>('loading');
   const [routeId, setRouteId] = useState(0);
   const go = useCallback((r: Route) => {
     setRoute(r);
@@ -101,7 +105,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     window.scrollTo({ top: 0 });
   }, []);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [teacherUnlocked, setTeacherUnlocked] = useState(false);
   const dataRef = useRef(data);
   const catRef = useRef(catalog);
   const toastId = useRef(0);
@@ -119,6 +122,22 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       }
       void requestPersistence();
       setReady(true);
+      // Catálogo pronto gerado no servidor (substitui o painel do professor)
+      try {
+        const res = await fetch('./catalog.json', { cache: 'no-cache' });
+        if (!res.ok) throw new Error(String(res.status));
+        const remote = (await res.json()) as Catalog;
+        const local = catRef.current;
+        if (remote.tracks?.length && (!local.syncedAt || !local.tracks.length || (remote.syncedAt ?? '') > local.syncedAt)) {
+          const next = { ...EMPTY_CATALOG, ...remote, excluded: local.excluded, failures: {} };
+          catRef.current = next;
+          setCatalog(next);
+          void saveCatalog(next);
+        }
+        setCatalogStatus('ready');
+      } catch {
+        setCatalogStatus(catRef.current.tracks.length ? 'ready' : 'unavailable');
+      }
     })();
   }, []);
 
@@ -190,14 +209,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   /** Registra o fim de uma partida: histórico, campeonato, fila, conquistas. */
   const finishGame = useCallback<Store['finishGame']>((session, launch) => {
     const d0 = dataRef.current;
-    const ctx = launch.context;
-    const isChamp = ctx.kind === 'champ-qual' || ctx.kind === 'champ-bout';
-    let records = toMatchRecords(session);
-    let note: string | undefined;
-    if (session.finishedReason === 'aborted' && isChamp) {
-      records = [];
-      note = 'Partida de campeonato interrompida: nada foi registrado. Ela pode ser jogada novamente.';
-    }
+    const records = toMatchRecords(session);
     const newRecord: Record<string, boolean> = {};
     for (const r of records) {
       const prev = previousBest(r.playerId, r.mode, d0.matches);
@@ -205,34 +217,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
     let d: AppData = { ...d0, matches: [...d0.matches, ...records] };
 
-    // Campeonato
-    if (records.length && ctx.kind === 'champ-qual') {
-      d = {
-        ...d,
-        championships: d.championships.map((c) => (c.id === ctx.championshipId ? recordQualifying(c, records[0].playerId, records[0].id) : c)),
-      };
-    }
-    if (ctx.kind === 'champ-bout' && records.length === 2 && session.finishedReason !== 'aborted') {
-      const pool = usableTracks(catRef.current);
-      d = {
-        ...d,
-        championships: d.championships.map((c) => {
-          if (c.id !== ctx.championshipId) return c;
-          const bout = c.final?.id === ctx.boutId ? c.final : c.semifinals.find((b) => b.id === ctx.boutId);
-          if (!bout) return c;
-          const by = (f: (m: MatchRecord) => number) => Object.fromEntries(records.map((m) => [m.playerId, f(m)]));
-          const res = decideBout(
-            bout, by((m) => m.score), by((m) => m.correct), by((m) => m.answers.reduce((s, a) => s + a.timeMs, 0)), session.groupId,
-          );
-          return recordBout(c, ctx.boutId, res, d.matches, pool, makeRng(Date.now()));
-        }),
-      };
-    }
-    // Fila
-    if (records.length && (ctx.kind === 'queue' || ctx.kind === 'champ-qual')) {
-      const ids = new Set(records.map((r) => r.playerId));
-      d = { ...d, queue: { ...d.queue, items: d.queue.items.map((i) => (ids.has(i.playerId) ? { ...i, played: true } : i)) } };
-    }
     // Conquistas
     const top = topPlayerId(d.matches, d.players);
     const newAchievements: Record<string, string[]> = {};
@@ -243,15 +227,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       newAchievements[r.playerId] = fresh;
       for (const a of fresh) unlocks.push({ playerId: r.playerId, achievementId: a, unlockedAt: new Date().toISOString() });
     }
-    // Campeão do campeonato (conquista "Lenda") pode ser de um jogador desta partida
     d = { ...d, achievements: unlocks };
     persist(d);
-    return { records, launch, reason: session.finishedReason, newAchievements, newRecord, championshipNote: note };
+    return { records, launch, reason: session.finishedReason, newAchievements, newRecord };
   }, [persist]);
 
   const value: Store = {
     ready, data, catalog, tracks, route, routeId, go, update, updateCatalog, getCatalog, currentPlayer, setCurrentPlayer,
-    toasts, toast, dismissToast, backup, finishGame, replaceAll, teacherUnlocked, setTeacherUnlocked,
+    toasts, toast, dismissToast, backup, finishGame, replaceAll, catalogStatus,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

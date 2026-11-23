@@ -1,22 +1,35 @@
 import { motion } from 'framer-motion';
-import { AlertTriangle, ChevronRight, ListOrdered, Play, RefreshCw, Trophy } from 'lucide-react';
-import { useMemo } from 'react';
+import { AlertTriangle, Globe, ListOrdered, Play, RefreshCw } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Icon } from '../components/Icon';
-import { Badge, Button } from '../components/ui';
+import { Badge, Button, Spinner } from '../components/ui';
 import { Equalizer, Logo } from '../components/visuals';
 import { CATEGORIES } from '../data/artists';
 import { MODES } from '../data/modes';
 import { personalStats, positionOf } from '../ranking/ranking';
-import { filterPool } from '../services/catalog';
+import { filterPool, syncCatalog } from '../services/catalog';
+import { OnlineHomeCard } from './Online';
 import { useStore } from '../state/AppStore';
 import type { CategoryId, ModeId } from '../types';
 import { fmtNumber, pct } from '../utils';
 
 export function HomePage() {
-  const { data, tracks, catalog, currentPlayer, go } = useStore();
+  const { data, tracks, currentPlayer, go, catalogStatus, getCatalog, updateCatalog, toast } = useStore();
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const syncHere = async () => {
+    setSyncing('Começando…');
+    try {
+      const next = await syncCatalog(getCatalog(), (p) => setSyncing(`${p.done}/${p.total}${p.current ? ` · ${p.current}` : ''}`));
+      updateCatalog(() => next);
+      toast(`${next.tracks.length} músicas carregadas!`, 'success');
+    } catch {
+      toast('Não foi possível buscar as músicas. Verifique a internet.', 'error');
+    } finally {
+      setSyncing(null);
+    }
+  };
   const stats = currentPlayer ? personalStats(currentPlayer.id, data.matches) : null;
   const pos = currentPlayer ? positionOf(currentPlayer.id, data.matches, data.players) : null;
-  const activeChamp = data.championships.find((c) => c.status !== 'encerrado' && c.status !== 'cancelado');
   const catCounts = useMemo(
     () => Object.fromEntries(CATEGORIES.map((c) => [c.id, filterPool(tracks, { categories: [c.id], artists: [], extra: 'random' }).length])),
     [tracks],
@@ -39,14 +52,14 @@ export function HomePage() {
           <Badge tone="accent" className="mb-6">Trap · Funk · Sertanejo · MPB · Pop · e muito mais</Badge>
           <Logo size="lg" />
           <p className="mt-6 max-w-xl text-lg text-zinc-400">
-            Ouça o trecho, descubra a música e suba no ranking da turma. Prévias oficiais, nomes e artistas verificados.
+            Ouça o trecho, descubra a música e desafie seus amigos online — em times ou todos contra todos. Prévias oficiais, nomes e artistas verificados.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Button variant="primary" size="xl" icon={<Play size={22} fill="currentColor" />} onClick={() => play('classic')} disabled={!tracks.length}>
               JOGAR
             </Button>
             <Button size="lg" icon={<ListOrdered size={18} />} onClick={() => go({ name: 'ranking' })}>Ranking</Button>
-            <Button size="lg" icon={<Trophy size={18} />} onClick={() => go({ name: 'championship' })}>Campeonato</Button>
+            <Button size="lg" icon={<Globe size={18} />} onClick={() => go({ name: 'online' })}>Jogar online</Button>
           </div>
           {currentPlayer && stats && (
             <div className="mt-8 flex flex-wrap gap-6 text-sm">
@@ -59,30 +72,21 @@ export function HomePage() {
         </motion.div>
       </section>
 
-      {!tracks.length && (
+      {!tracks.length && catalogStatus === 'loading' && (
+        <div className="glass flex items-center gap-3 p-5 text-zinc-300"><Spinner size={18} /> Carregando as músicas…</div>
+      )}
+      {!tracks.length && catalogStatus === 'unavailable' && (
         <div className="glass flex flex-wrap items-center gap-4 border-amber-500/30 p-5">
           <AlertTriangle className="text-amber-300" />
           <div className="flex-1">
-            <div className="font-semibold">Catálogo musical ainda não sincronizado</div>
-            <div className="text-sm text-zinc-400">
-              {catalog.syncedAt ? 'Nenhuma música verificada está disponível no momento.' : 'O jogo precisa buscar as prévias oficiais na Apple Music (requer internet, leva cerca de 1 minuto).'}
-            </div>
+            <div className="font-semibold">Músicas ainda não carregadas</div>
+            <div className="text-sm text-zinc-400">{syncing ? `Buscando na Apple Music: ${syncing}` : 'Busque as prévias oficiais na Apple Music (precisa de internet e leva alguns minutos).'}</div>
           </div>
-          <Button variant="primary" icon={<RefreshCw size={16} />} onClick={() => go({ name: 'teacher' })}>Abrir painel do professor</Button>
+          <Button variant="primary" icon={syncing ? <Spinner size={16} /> : <RefreshCw size={16} />} onClick={syncHere} disabled={!!syncing}>Buscar músicas</Button>
         </div>
       )}
 
-      {activeChamp && (
-        <button onClick={() => go({ name: 'championship', id: activeChamp.id })} className="glass flex w-full items-center gap-4 border-gold/25 p-5 text-left transition hover:border-gold/50">
-          <span className="rounded-xl bg-gold/15 p-3 text-gold"><Trophy /></span>
-          <div className="flex-1">
-            <div className="label !text-gold">Campeonato em andamento</div>
-            <div className="h-display text-lg">{activeChamp.name}</div>
-            <div className="text-sm text-zinc-400">Fase: {activeChamp.status === 'classificatoria' ? 'Classificatória' : activeChamp.status === 'semifinal' ? 'Semifinal' : 'Final'} · {activeChamp.participantIds.length} participantes</div>
-          </div>
-          <ChevronRight className="text-zinc-500" />
-        </button>
-      )}
+      <OnlineHomeCard onOpen={() => go({ name: 'online' })} />
 
       {/* Modos */}
       <section>

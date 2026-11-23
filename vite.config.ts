@@ -7,5 +7,6 @@ export default defineConfig({
   base: './',
   plugins: [react(), viteSingleFile()],
   build: { assetsInlineLimit: 100_000_000, cssCodeSplit: false, chunkSizeWarningLimit: 4000 },
-  test: { environment: 'jsdom', include: ['tests/**/*.test.ts'] },
+  server: { proxy: { '/ws': { target: 'ws://localhost:3000', ws: true }, '/catalog.json': 'http://localhost:3000' } },
+  test: { environment: 'jsdom', include: ['tests/**/*.test.ts', 'tests/**/*.test.mjs'] },
 });

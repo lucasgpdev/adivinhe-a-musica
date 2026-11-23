@@ -48,7 +48,7 @@ export function IdentifyPage({ then }: { then?: Route }) {
       toast(`Bem-vindo(a), ${r.player.name}!`, 'success');
       go(then ?? { name: 'home' });
     } else {
-      if (r.player.archived) { setError('Este nome pertence a um participante arquivado. Peça ao professor para restaurá-lo.'); return; }
+      if (r.player.archived) { setError('Este nome pertence a um participante arquivado. Escolha outro nome.'); return; }
       toast(`"${r.player.name}" já estava cadastrado — entrando com esse jogador.`, 'info');
       choose(r.player.id);
     }

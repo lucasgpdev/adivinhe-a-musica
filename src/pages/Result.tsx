@@ -17,7 +17,6 @@ export function ResultPage({ result }: { result: GameResultInfo }) {
   const multi = result.launch.playerIds.length > 1;
   const mode = MODE_BY_ID[result.launch.config.mode.id];
   const ctx = result.launch.context;
-  const champ = ctx.kind === 'champ-qual' || ctx.kind === 'champ-bout' ? data.championships.find((c) => c.id === ctx.championshipId) : undefined;
   const anyRecord = Object.values(result.newRecord).some(Boolean);
 
   useEffect(() => {
@@ -25,13 +24,13 @@ export function ResultPage({ result }: { result: GameResultInfo }) {
   }, [multi, anyRecord]);
 
   const again = () => go({ name: 'game', launch: { ...result.launch, config: { ...result.launch.config } } });
-  const canReplay = ctx.kind === 'normal' || ctx.kind === 'queue';
+  const canReplay = ctx.kind === 'normal';
 
   if (!recs.length) {
     return (
       <div className="mx-auto max-w-lg py-16 text-center">
         <p className="text-zinc-400">{result.championshipNote ?? 'Nenhuma resposta registrada.'}</p>
-        <Button className="mt-6" variant="primary" onClick={() => go(champ ? { name: 'championship', id: champ.id } : { name: 'home' })}>Voltar</Button>
+        <Button className="mt-6" variant="primary" onClick={() => go({ name: 'home' })}>Voltar</Button>
       </div>
     );
   }
@@ -126,12 +125,7 @@ export function ResultPage({ result }: { result: GameResultInfo }) {
       )}
 
       <div className="mt-10 flex flex-wrap justify-center gap-3">
-        {champ ? (
-          <Button variant="primary" size="lg" icon={<Trophy size={18} />} onClick={() => go({ name: 'championship', id: champ.id })}>Voltar ao campeonato</Button>
-        ) : ctx.kind === 'queue' ? (
-          <Button variant="primary" size="lg" icon={<ListOrdered size={18} />} onClick={() => go({ name: 'queue' })}>Próximo da fila</Button>
-        ) : null}
-        {canReplay && ctx.kind !== 'queue' && <Button variant={champ ? 'secondary' : 'primary'} size="lg" icon={<RotateCcw size={18} />} onClick={again}>Jogar novamente</Button>}
+        {canReplay && <Button variant="primary" size="lg" icon={<RotateCcw size={18} />} onClick={again}>Jogar novamente</Button>}
         <Button size="lg" icon={<ListOrdered size={18} />} onClick={() => go({ name: 'ranking' })}>Ver ranking</Button>
         <Button size="lg" variant="ghost" icon={<Home size={18} />} onClick={() => go({ name: 'home' })}>Voltar ao menu</Button>
       </div>

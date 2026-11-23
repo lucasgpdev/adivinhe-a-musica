@@ -1,9 +1,6 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import { computePlayerStats, evaluateAchievements } from '../src/achievements/achievements';
-import {
-  createChampionship, decideBout, pendingBout, qualifyingStandings, recordBout, recordQualifying, resetPhase, startKnockout,
-} from '../src/championship/championship';
 import { ARTIST_BY_ID } from '../src/data/artists';
 import { cleanTitle, filterPool, isVariant, markHits, processArtistResults, splitArtists } from '../src/services/catalog';
 import { computeRanking, hallOfFame } from '../src/ranking/ranking';
@@ -11,7 +8,6 @@ import { buildExport, mergeImport } from '../src/storage/backup';
 import { createBackup, listBackups, loadData, saveData } from '../src/storage/db';
 import { emptyData } from '../src/state/defaults';
 import type { MatchRecord, Player } from '../src/types';
-import { makeRng } from '../src/utils';
 import { fakeTracks, itunesSong } from './fixtures';
 
 describe('catálogo (verificação)', () => {
@@ -121,55 +117,6 @@ describe('ranking', () => {
     const h = hallOfFame(ms, [], players);
     expect(h.topScores[0].playerId).toBe('caio');
     expect(h.longestStreaks[0].streak).toBe(10);
-  });
-});
-
-describe('campeonato', () => {
-  it('fluxo completo: classificatória → semifinais → final → pódio', () => {
-    const pool = fakeTracks(120);
-    const rng = makeRng(1);
-    let ch = createChampionship('Turma A', players.map((p) => p.id), { questions: 5, timeSec: 15, categories: [], artists: [] }, pool, rng);
-    expect(ch.qualifying.questionIds).toHaveLength(5);
-    const scores: Record<string, number> = { ana: 900, bia: 800, caio: 700, davi: 600, edu: 100 };
-    const ms: MatchRecord[] = [];
-    for (const p of players) {
-      const m = match(p.id, scores[p.id], 5, 5, '2026-11-16T10:00:00');
-      ms.push(m);
-      ch = recordQualifying(ch, p.id, m.id);
-    }
-    // não pode jogar duas vezes
-    expect(recordQualifying(ch, 'ana', 'outra').qualifying.results.ana).toBe(ms[0].id);
-    expect(qualifyingStandings(ch, ms)[0].playerId).toBe('ana');
-    ch = startKnockout(ch, ms, pool, rng);
-    expect(ch.status).toBe('semifinal');
-    expect([ch.semifinals[0].a, ch.semifinals[0].b]).toEqual(['ana', 'davi']);
-    expect([ch.semifinals[1].a, ch.semifinals[1].b]).toEqual(['bia', 'caio']);
-    const all = new Set([...ch.qualifying.questionIds, ...ch.semifinals.flatMap((b) => b.questionIds)]);
-    expect(all.size).toBe(15); // sem músicas repetidas entre fases
-    const b1 = pendingBout(ch)!;
-    ch = recordBout(ch, b1.id, decideBout(b1, { ana: 300, davi: 500 }, { ana: 3, davi: 5 }, { ana: 1, davi: 1 }, 'g1'), ms, pool, rng);
-    const b2 = pendingBout(ch)!;
-    ch = recordBout(ch, b2.id, decideBout(b2, { bia: 400, caio: 400 }, { bia: 4, caio: 4 }, { bia: 900, caio: 500 }, 'g2'), ms, pool, rng);
-    expect(ch.status).toBe('final');
-    expect([ch.final!.a, ch.final!.b]).toEqual(['davi', 'caio']);
-    const f = pendingBout(ch)!;
-    ch = recordBout(ch, f.id, decideBout(f, { davi: 100, caio: 900 }, { davi: 1, caio: 9 }, { davi: 1, caio: 1 }, 'g3'), ms, pool, rng);
-    expect(ch.status).toBe('encerrado');
-    expect(ch.podium).toEqual({ first: 'caio', second: 'davi', third: 'bia' });
-    const reset = resetPhase(ch, 'final');
-    expect(reset.status).toBe('final');
-    expect(reset.podium).toBeUndefined();
-    expect(reset.resets).toBe(1);
-  });
-  it('com 2 ou 3 participantes vai direto para a final', () => {
-    const pool = fakeTracks(60);
-    const rng = makeRng(2);
-    let ch = createChampionship('Mini', ['ana', 'bia', 'caio'], { questions: 5, timeSec: 15, categories: [], artists: [] }, pool, rng);
-    const ms = ['ana', 'bia', 'caio'].map((p, i) => match(p, 100 * (i + 1), 1, 5, '2026-11-16T10:00:00'));
-    ms.forEach((m) => (ch = recordQualifying(ch, m.playerId, m.id)));
-    ch = startKnockout(ch, ms, pool, rng);
-    expect(ch.status).toBe('final');
-    expect([ch.final!.a, ch.final!.b]).toEqual(['caio', 'bia']);
   });
 });
 

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Award, Check, Crown, Flame, Lock, Medal, Pencil, Star, Trophy } from 'lucide-react';
+import { Award, Check, Flame, Lock, Medal, Pencil, Star, Trophy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ACHIEVEMENTS, computePlayerStats } from '../achievements/achievements';
 import { Icon } from '../components/Icon';
@@ -23,23 +23,7 @@ export function HallOfFamePage() {
   if (!data.matches.length) return <><PageHeader title="Hall da Fama" /><Empty icon={<Medal size={28} />} title="A história ainda vai ser escrita" text="Os recordes aparecem aqui depois das primeiras partidas." /></>;
   return (
     <div>
-      <PageHeader title="Hall da Fama" subtitle="Campeões, recordes históricos e as maiores marcas da turma." />
-      <section className="mb-10">
-        <h2 className="h-display mb-4 flex items-center gap-2 text-xl"><Crown className="text-gold" size={20} /> Campeões anteriores</h2>
-        {h.champions.length === 0 ? <p className="text-sm text-zinc-500">Nenhum campeonato encerrado ainda.</p> : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {h.champions.map((c) => (
-              <div key={c.championship.id} className="glass relative overflow-hidden border-gold/20 p-5">
-                <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gold/20 blur-2xl" />
-                <div className="label">{fmtDate(c.championship.endedAt ?? c.championship.createdAt)}</div>
-                <div className="h-display text-lg">{c.championship.name}</div>
-                <div className="mt-4 flex items-center gap-3"><Avatar id={avatar(c.first)} size={48} ring /><div><div className="text-xs text-gold">Campeão</div><div className="h-display text-xl">{name(c.first)}</div></div></div>
-                <div className="mt-3 flex gap-4 text-sm text-zinc-400"><span>🥈 {name(c.second)}</span><span>🥉 {name(c.third)}</span></div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <PageHeader title="Hall da Fama" subtitle="Recordes históricos e as maiores marcas do modo solo neste navegador." />
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="glass p-6">
           <h2 className="h-display mb-4 flex items-center gap-2 text-lg"><Star size={18} className="text-accent-soft" /> Maiores pontuações</h2>
@@ -66,7 +50,7 @@ export function HallOfFamePage() {
         </section>
         <section className="glass p-6">
           <h2 className="h-display mb-4 flex items-center gap-2 text-lg"><Trophy size={18} className="text-gold" /> Mais vitórias</h2>
-          {h.mostWins.length === 0 ? <p className="text-sm text-zinc-500">Vitórias contam em Duelo, Batalha, Sobrevivência e campeonatos.</p> : (
+          {h.mostWins.length === 0 ? <p className="text-sm text-zinc-500">Vitórias contam em Duelo, Batalha e Sobrevivência.</p> : (
             <ol className="space-y-2">{h.mostWins.map((w, i) => (
               <li key={w.playerId} className="flex items-center gap-3 text-sm"><span className="w-6 text-center font-bold text-zinc-500">{i + 1}</span><Avatar id={avatar(w.playerId)} size={28} /><span className="flex-1">{name(w.playerId)}</span><span className="h-display">{w.wins}</span></li>
             ))}</ol>

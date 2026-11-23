@@ -216,7 +216,7 @@ export function GamePage({ launch }: { launch: GameLaunch }) {
     engine.current!.stop();
     if (session.players.every((p) => p.answers.length === 0)) {
       if (session.finishedReason === 'aborted') { go({ name: 'home' }); return; }
-      setFatal('Não há músicas verificadas suficientes para esta configuração. Escolha outros filtros ou peça ao professor para sincronizar o catálogo.');
+      setFatal('Não há músicas verificadas suficientes para esta configuração. Escolha outros gêneros ou filtros.');
       return;
     }
     const result = finishGame(session, launch);

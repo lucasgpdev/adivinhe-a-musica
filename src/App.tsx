@@ -2,16 +2,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Layout } from './components/Layout';
 import { ConfirmProvider } from './components/ui';
 import { Equalizer, Toasts } from './components/visuals';
-import { ChampionshipPage } from './pages/Championship';
 import { GamePage } from './pages/Game';
 import { AchievementsPage, HallOfFamePage, ProfilePage } from './pages/HallAchievementsProfile';
 import { HomePage } from './pages/Home';
 import { IdentifyPage } from './pages/Identify';
-import { QueuePage } from './pages/Queue';
+import { OnlinePage } from './pages/Online';
 import { RankingPage } from './pages/Ranking';
 import { ResultPage } from './pages/Result';
 import { SetupPage } from './pages/Setup';
-import { TeacherPage } from './pages/Teacher';
 import { AppStoreProvider, useStore, type Route } from './state/AppStore';
 
 function Page({ route }: { route: Route }) {
@@ -23,11 +21,9 @@ function Page({ route }: { route: Route }) {
     case 'result': return <ResultPage result={route.result} />;
     case 'ranking': return <RankingPage />;
     case 'hall': return <HallOfFamePage />;
-    case 'championship': return <ChampionshipPage id={route.id} />;
+    case 'online': return <OnlinePage code={route.code} />;
     case 'achievements': return <AchievementsPage />;
     case 'profile': return <ProfilePage />;
-    case 'teacher': return <TeacherPage />;
-    case 'queue': return <QueuePage />;
   }
 }
 

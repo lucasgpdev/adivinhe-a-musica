@@ -1,5 +1,5 @@
 import {
-  Award, GraduationCap, Home, ListOrdered, Maximize, Medal, Minimize, Presentation, Trophy, UserPlus, Users, Volume2, VolumeX,
+  Award, Globe, Home, ListOrdered, Maximize, Medal, Minimize, Presentation, UserPlus, Volume2, VolumeX,
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useStore, type Route } from '../state/AppStore';
@@ -8,12 +8,10 @@ import { Avatar, Logo } from './visuals';
 
 const NAV: { route: Route; label: string; icon: ReactNode; match: Route['name'][] }[] = [
   { route: { name: 'home' }, label: 'Jogar', icon: <Home size={17} />, match: ['home', 'setup', 'result'] },
+  { route: { name: 'online' }, label: 'Online', icon: <Globe size={17} />, match: ['online'] },
   { route: { name: 'ranking' }, label: 'Ranking', icon: <ListOrdered size={17} />, match: ['ranking'] },
   { route: { name: 'hall' }, label: 'Hall da Fama', icon: <Medal size={17} />, match: ['hall'] },
-  { route: { name: 'championship' }, label: 'Campeonato', icon: <Trophy size={17} />, match: ['championship'] },
   { route: { name: 'achievements' }, label: 'Conquistas', icon: <Award size={17} />, match: ['achievements'] },
-  { route: { name: 'queue' }, label: 'Fila', icon: <Users size={17} />, match: ['queue'] },
-  { route: { name: 'teacher' }, label: 'Professor', icon: <GraduationCap size={17} />, match: ['teacher'] },
 ];
 
 export function useFullscreen(): [boolean, () => void] {
@@ -92,7 +90,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className={cx('mx-auto w-full flex-1', inGame ? 'max-w-none' : 'max-w-7xl px-4 py-8 md:px-6 md:py-10')}>{children}</main>
       {!inGame && (
         <footer className="mx-auto w-full max-w-7xl px-6 pb-6 pt-2 text-xs text-zinc-600">
-          Prévias musicais oficiais fornecidas pela Apple Music (iTunes). Dados salvos apenas neste computador e navegador.
+          Prévias musicais oficiais fornecidas pela Apple Music (iTunes). Jogadores e recordes do modo solo ficam salvos neste navegador.
         </footer>
       )}
     </div>
