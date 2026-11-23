@@ -9,7 +9,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { ARTISTS } from '../src/data/artists';
+import { ARTISTS, CATEGORY_GENRES } from '../src/data/artists';
 import { EMPTY_CATALOG, markHits, processArtistResults } from '../src/services/catalog';
 import type { ItunesResponse, ItunesTrack } from '../src/services/itunes';
 import type { Catalog, Track } from '../src/types';
@@ -54,7 +54,13 @@ async function main() {
   for (const [i, a] of ARTISTS.entries()) {
     if (i > 0) await sleep(INTERVAL_MS);
     try {
-      const r = processArtistResults(a, await search(a.name), undefined);
+      const results = await search(a.name);
+      let r = processArtistResults(a, results, undefined);
+      if (r.status.status === 'pendente' && r.status.candidates?.length) {
+        // Sem professor para confirmar: escolhe o perfil (mesmo nome) do gênero certo com mais músicas.
+        const pick = r.status.candidates.find((c) => c.genres.some((g) => a.categories.some((cat) => CATEGORY_GENRES[cat].test(g))));
+        if (pick) r = processArtistResults(a, results, [pick.appleArtistId]);
+      }
       artists[a.id] = r.status;
       tracks = tracks.concat(r.tracks);
       console.log(`[catálogo] ${i + 1}/${ARTISTS.length} ${a.name}: ${r.tracks.length} músicas (${r.status.status})`);
