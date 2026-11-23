@@ -6,7 +6,7 @@ import { migrate } from '../src/state/defaults';
 
 describe('gêneros', () => {
   it('todo gênero (exceto Hits) tem artistas suficientes', () => {
-    for (const c of CATEGORIES.filter((x) => x.id !== 'hits' && x.id !== 'tiktok')) {
+    for (const c of CATEGORIES.filter((x) => x.id !== 'hits' && x.id !== 'tiktok' && x.id !== 'submundo')) {
       const n = ARTISTS.filter((a) => a.categories.includes(c.id as never)).length;
       expect(n, c.name).toBeGreaterThanOrEqual(5);
     }
@@ -30,6 +30,20 @@ describe('gêneros', () => {
     expect(notViral.categories).not.toContain('tiktok');
   });
 
+  it('Submundo 808: só músicas de 2024 em diante dos artistas da cena', () => {
+    const now = new Date('2026-11-23');
+    const base = fakeTrack(2, 'dj-clei', 2, ['funk']);
+    const [nova, velha, outro] = markHits([
+      { ...base, year: 2024, rankInArtist: 40 },
+      { ...base, year: 2023 },
+      { ...base, artistId: 'mc-ig', year: 2025 },
+    ], now);
+    expect(nova.categories).toEqual(['funk', 'submundo']);
+    expect(velha.categories).not.toContain('submundo');
+    expect(outro.categories).not.toContain('submundo');
+    expect(ARTISTS.filter((a) => a.submundo).length).toBeGreaterThanOrEqual(10);
+  });
+
   it('ids de artistas são únicos', () => {
     expect(new Set(ARTISTS.map((a) => a.id)).size).toBe(ARTISTS.length);
   });
@@ -43,6 +57,6 @@ describe('gêneros', () => {
     // depois de salvo, não reativa o que for desligado
     const again = migrate({ settings: { ...d.settings, enabledCategories: ['trap'] } });
     expect(again.settings.enabledCategories).toEqual(['trap']);
-    expect(ALL_CATEGORY_IDS.length).toBe(13);
+    expect(ALL_CATEGORY_IDS.length).toBe(14);
   });
 });

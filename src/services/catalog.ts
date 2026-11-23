@@ -203,16 +203,23 @@ export function processArtistResults(
  * Categorias calculadas:
  *  - Hits do Momento: lançamentos dos últimos 2 anos entre as 5 mais bem posicionadas de cada artista.
  *  - TikTok: as 10 mais populares (últimos 4 anos) dos artistas marcados com `tiktok`.
+ *  - Submundo 808: músicas de 2024 em diante dos artistas marcados com `submundo`.
  */
+/** Categoria Submundo 808: só lançamentos a partir deste ano. */
+export const SUBMUNDO_FROM = 2024;
+
 export function markHits(tracks: Track[], now = new Date()): Track[] {
   const minYear = now.getFullYear() - 1;
   const tiktokYear = now.getFullYear() - 3;
   return tracks.map((t) => {
     const isHit = (t.year ?? 0) >= minYear && t.rankInArtist < 5;
-    const viral = !!ARTIST_BY_ID[t.artistId]?.tiktok && (t.year ?? 0) >= tiktokYear && t.rankInArtist < 10;
-    const cats: CategoryId[] = t.categories.filter((c) => c !== 'hits' && c !== 'tiktok');
+    const a = ARTIST_BY_ID[t.artistId];
+    const viral = !!a?.tiktok && (t.year ?? 0) >= tiktokYear && t.rankInArtist < 10;
+    const submundo = !!a?.submundo && (t.year ?? 0) >= SUBMUNDO_FROM;
+    const cats: CategoryId[] = t.categories.filter((c) => c !== 'hits' && c !== 'tiktok' && c !== 'submundo');
     if (isHit) cats.push('hits');
     if (viral) cats.push('tiktok');
+    if (submundo) cats.push('submundo');
     return { ...t, isHit, categories: cats };
   });
 }

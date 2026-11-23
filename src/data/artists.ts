@@ -152,12 +152,31 @@ export const ARTISTS: ArtistDef[] = [
   { id: 'mc-tuto', name: 'MC Tuto', categories: ['funk'], tiktok: true },
   { id: 'mari-fernandez', name: 'Mari Fernandez', categories: ['forro', 'sofrencia'], tiktok: true },
   { id: 'dj-arana', name: 'DJ Arana', categories: ['funk'], tiktok: true },
+
+  // ── Submundo 808 (funk mandelão de Campinas) — entram só as de 2024 em diante ──
+  { id: 'submundo-808', name: 'Submundo 808', aliases: ['submundo808'], categories: ['funk'], submundo: true },
+  { id: 'dj-clei', name: 'Dj Clei', categories: ['funk'], submundo: true },
+  { id: 'dj-tresk', name: 'DJ Tresk', aliases: ['tresk'], categories: ['funk'], submundo: true },
+  { id: 'kenan-kel', name: 'Kenan & Kel DJs', aliases: ['kenan e kel djs', 'kenan & kel', 'kenan e kel'], categories: ['funk'], submundo: true },
+  { id: 'novin-yarp', name: 'Novin Yarp', categories: ['funk'], submundo: true },
+  { id: 'dj-petala', name: 'Dj Pétala', categories: ['funk'], submundo: true },
+  { id: 'mc-jhey', name: 'MC Jhey', categories: ['funk'], submundo: true },
+  { id: 'yuri-redicopa', name: 'Yuri Redicopa', categories: ['funk'], submundo: true },
+  { id: 'chris-silva', name: 'Chris Silva', categories: ['funk'], submundo: true },
+  { id: 'dj-caio-prince', name: 'DJ Caio Prince', categories: ['funk'], submundo: true },
+  { id: 'dj-thiago-martins', name: 'DJ Thiago Martins', categories: ['funk'], submundo: true },
+  { id: 'mc-gw', name: 'MC GW', categories: ['funk'], submundo: true },
+  { id: 'mc-magrinho', name: 'Mc Magrinho', categories: ['funk'], submundo: true },
+  { id: 'dj-ll', name: 'DJ LL', categories: ['funk'], submundo: true },
+  { id: 'mc-meduza', name: 'MC Meduza', categories: ['funk'], submundo: true },
+  { id: 'dj-m13', name: 'DJ M13 da ZO', aliases: ['dj m13'], categories: ['funk'], submundo: true },
 ];
 
 export const ARTIST_BY_ID: Record<string, ArtistDef> = Object.fromEntries(ARTISTS.map((a) => [a.id, a]));
 
 export const CATEGORIES: { id: CategoryId; name: string; short: string; description: string }[] = [
   { id: 'tiktok', name: 'Virais do TikTok', short: 'TikTok', description: 'As famosinhas do TikTok: funk, sertanejo, pagode e piseiro.' },
+  { id: 'submundo', name: 'Submundo 808', short: 'Submundo', description: 'O funk mandelão da cena de Campinas — lançamentos de 2024 a 2026.' },
   { id: 'trap', name: 'Trap Nacional', short: 'Trap', description: 'O trap brasileiro que domina as paradas.' },
   { id: 'funk', name: 'Funk Nacional', short: 'Funk', description: 'Funk de SP e do Rio, das quebradas para o mundo.' },
   { id: 'rap', name: 'Rap Nacional', short: 'Rap', description: 'Rimas e flow de quem escreve a cena.' },
@@ -179,7 +198,7 @@ export const ALL_CATEGORY_IDS: CategoryId[] = CATEGORIES.map((c) => c.id);
  * Usado para escolher automaticamente o perfil certo quando existe mais de
  * um artista com o mesmo nome na Apple Music.
  */
-export const CATEGORY_GENRES: Record<Exclude<CategoryId, 'hits' | 'tiktok'>, RegExp> = {
+export const CATEGORY_GENRES: Record<Exclude<CategoryId, 'hits' | 'tiktok' | 'submundo'>, RegExp> = {
   trap: /hip|rap|trap|funk|brasil|brazil|urban|pop|r&b|soul|dance|electronic|eletr/i,
   funk: /hip|rap|trap|funk|brasil|brazil|urban|pop|r&b|soul|dance|electronic|eletr/i,
   rap: /hip|rap|trap|funk|brasil|brazil|urban|pop|r&b|soul|dance|electronic|eletr/i,

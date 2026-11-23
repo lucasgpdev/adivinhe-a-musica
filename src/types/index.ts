@@ -15,6 +15,7 @@ export type CategoryId =
   | 'rock-br'
   | 'forro'
   | 'tiktok'
+  | 'submundo'
   | 'hits';
 /** 1 = Fácil, 2 = Médio, 3 = Difícil, 4 = Extremo */
 export type Difficulty = 1 | 2 | 3 | 4;
@@ -25,9 +26,11 @@ export interface ArtistDef {
   name: string;
   /** Grafias alternativas aceitas na conferência (sem acento/maiúsculas). */
   aliases?: string[];
-  categories: Exclude<CategoryId, 'hits' | 'tiktok'>[];
+  categories: Exclude<CategoryId, 'hits' | 'tiktok' | 'submundo'>[];
   /** Artista com hits virais no TikTok: suas músicas mais populares e recentes entram na categoria TikTok. */
   tiktok?: boolean;
+  /** Artista da cena Submundo 808: as músicas de 2024 em diante entram na categoria Submundo 808. */
+  submundo?: boolean;
 }
 
 /** Música verificada — todos os campos textuais vêm da fonte oficial (Apple). */
