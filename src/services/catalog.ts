@@ -12,7 +12,7 @@
  *  - Sem prévia oficial → música não entra.
  *  - Nenhuma letra é exibida.
  */
-import { ARTISTS, CATEGORY_GENRES } from '../data/artists';
+import { ARTIST_BY_ID, ARTISTS, CATEGORY_GENRES } from '../data/artists';
 import type {
   AppleArtistCandidate, ArtistDef, Catalog, CatalogArtistStatus, CategoryId, Difficulty, ExtraFilter, Track,
 } from '../types';
@@ -199,13 +199,21 @@ export function processArtistResults(
   return { status: base, tracks };
 }
 
-/** Hits do Momento: lançamentos dos últimos 2 anos entre as 5 mais bem posicionadas de cada artista. */
+/**
+ * Categorias calculadas:
+ *  - Hits do Momento: lançamentos dos últimos 2 anos entre as 5 mais bem posicionadas de cada artista.
+ *  - TikTok: as 10 mais populares (últimos 4 anos) dos artistas marcados com `tiktok`.
+ */
 export function markHits(tracks: Track[], now = new Date()): Track[] {
   const minYear = now.getFullYear() - 1;
+  const tiktokYear = now.getFullYear() - 3;
   return tracks.map((t) => {
     const isHit = (t.year ?? 0) >= minYear && t.rankInArtist < 5;
-    const cats = t.categories.filter((c) => c !== 'hits');
-    return { ...t, isHit, categories: isHit ? [...cats, 'hits'] : cats };
+    const viral = !!ARTIST_BY_ID[t.artistId]?.tiktok && (t.year ?? 0) >= tiktokYear && t.rankInArtist < 10;
+    const cats: CategoryId[] = t.categories.filter((c) => c !== 'hits' && c !== 'tiktok');
+    if (isHit) cats.push('hits');
+    if (viral) cats.push('tiktok');
+    return { ...t, isHit, categories: cats };
   });
 }
 

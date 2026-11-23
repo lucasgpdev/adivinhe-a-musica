@@ -1,13 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { ARTISTS, ALL_CATEGORY_IDS, CATEGORIES } from '../src/data/artists';
+import { markHits } from '../src/services/catalog';
+import { fakeTrack } from './fixtures';
 import { migrate } from '../src/state/defaults';
 
 describe('gêneros', () => {
   it('todo gênero (exceto Hits) tem artistas suficientes', () => {
-    for (const c of CATEGORIES.filter((x) => x.id !== 'hits')) {
+    for (const c of CATEGORIES.filter((x) => x.id !== 'hits' && x.id !== 'tiktok')) {
       const n = ARTISTS.filter((a) => a.categories.includes(c.id as never)).length;
       expect(n, c.name).toBeGreaterThanOrEqual(5);
     }
+  });
+
+  it('TikTok: muitos artistas virais e só as mais populares e recentes entram', () => {
+    expect(ARTISTS.filter((a) => a.tiktok).length).toBeGreaterThanOrEqual(20);
+    expect(CATEGORIES.some((c) => c.id === ('gospel' as never))).toBe(false);
+    const now = new Date('2026-11-23');
+    const base = fakeTrack(1, 'mc-ig', 1, ['funk']);
+    const [top, old, deep, notViral] = markHits([
+      { ...base, rankInArtist: 0, year: 2025 },
+      { ...base, rankInArtist: 0, year: 2019 },
+      { ...base, rankInArtist: 30, year: 2025 },
+      { ...base, artistId: 'emicida', rankInArtist: 0, year: 2025 },
+    ], now);
+    expect(top.categories).toContain('tiktok');
+    expect(top.categories).toContain('funk');
+    expect(old.categories).not.toContain('tiktok');
+    expect(deep.categories).not.toContain('tiktok');
+    expect(notViral.categories).not.toContain('tiktok');
   });
 
   it('ids de artistas são únicos', () => {
@@ -18,6 +38,7 @@ describe('gêneros', () => {
     const d = migrate({ settings: { enabledCategories: ['trap', 'hits'] } as never });
     expect(d.settings.enabledCategories).toContain('sertanejo');
     expect(d.settings.enabledCategories).toContain('pop-intl');
+    expect(d.settings.enabledCategories).toContain('tiktok');
     expect(d.settings.enabledCategories).not.toContain('funk');
     // depois de salvo, não reativa o que for desligado
     const again = migrate({ settings: { ...d.settings, enabledCategories: ['trap'] } });
